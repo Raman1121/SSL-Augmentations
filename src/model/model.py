@@ -1,9 +1,12 @@
+import torch
 from torch import nn
 
 import timm
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 
+
+import torchvision.models as models
 from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 

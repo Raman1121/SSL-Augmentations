@@ -1,154 +1,70 @@
-import os
-from pathlib import Path
-from typing import List
+import pprint
+import torch
+import numpy as np
+import urllib
+from PIL import Image
 
-import hydra
-import omegaconf
-import pytorch_lightning as pl
-from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import seed_everything, Callback
-from pytorch_lightning.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-    ModelCheckpoint,
-)
-from pytorch_lightning.loggers import WandbLogger
-
-from src.common.utils import log_hyperparameters, PROJECT_ROOT
+import timm
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 
 
-def build_callbacks(cfg: DictConfig) -> List[Callback]:
-    callbacks: List[Callback] = []
+from torch import nn
+import torchvision
+import torchvision.models as models
+import torchvision.transforms as T
+from torchvision.datasets import CIFAR10
+from torch.utils.data import DataLoader
 
-    if "lr_monitor" in cfg.logging:
-        hydra.utils.log.info(f"Adding callback <LearningRateMonitor>")
-        callbacks.append(
-            LearningRateMonitor(
-                logging_interval=cfg.logging.lr_monitor.logging_interval,
-                log_momentum=cfg.logging.lr_monitor.log_momentum,
-            )
-        )
+from pl_bolts.models.self_supervised import SimCLR
+from pytorch_lightning.core.lightning import LightningModule
+from pytorch_lightning import Trainer
+from pl_bolts.datasets import DummyDataset
 
-    if "early_stopping" in cfg.train:
-        hydra.utils.log.info(f"Adding callback <EarlyStopping>")
-        callbacks.append(
-            EarlyStopping(
-                monitor=cfg.train.monitor_metric,
-                mode=cfg.train.monitor_metric_mode,
-                patience=cfg.train.early_stopping.patience,
-                verbose=cfg.train.early_stopping.verbose,
-            )
-        )
+from dataset import dataset
+from model import model
 
-    if "model_checkpoints" in cfg.train:
-        hydra.utils.log.info(f"Adding callback <ModelCheckpoint>")
-        callbacks.append(
-            ModelCheckpoint(
-                monitor=cfg.train.monitor_metric,
-                mode=cfg.train.monitor_metric_mode,
-                save_top_k=cfg.train.model_checkpoints.save_top_k,
-                verbose=cfg.train.model_checkpoints.verbose,
-            )
-        )
+aug_list = [T.RandomGrayscale(p=0.2), T.RandomHorizontalFlip(),
+             T.ColorJitter(0.4, 0.4, 0.4, 0.1)]
 
-    return callbacks
+'''
+* Feed a dataset of images and obtain embeddings for all images. 
+* Final output for a dataset should have size [num_samples, embedding_size]
+* 'embedding_size' depends on the encoder used. [ResNet, SimCLR = 2048, ViTs = 768]
+'''
 
+BATCH_SIZE = 10
 
-def run(cfg: DictConfig) -> None:
-    """
-    Generic train loop
+ds = dataset.get_dummy_dataset()
+dl = DataLoader(ds, batch_size=BATCH_SIZE)
+encoder = model.Encoder(encoder='vit_base_patch32_224_in21k')
 
-    :param cfg: run configuration, defined by Hydra in /conf
-    """
-    if cfg.train.deterministic:
-        seed_everything(cfg.train.random_seed)
+all_embeddings = torch.tensor([])
+final_dataset_embeddings = torch.tensor([])
 
-    if cfg.train.pl_trainer.fast_dev_run:
-        hydra.utils.log.info(
-            f"Debug mode <{cfg.train.pl_trainer.fast_dev_run=}>. "
-            f"Forcing debugger friendly configuration!"
-        )
-        # Debuggers don't like GPUs nor multiprocessing
-        cfg.train.pl_trainer.gpus = 0
-        cfg.data.datamodule.num_workers.train = 0
-        cfg.data.datamodule.num_workers.val = 0
-        cfg.data.datamodule.num_workers.test = 0
+for x, y in dl:
+    
+    #print(" ############ BATCH ############")
 
-        # Switch wandb mode to offline to prevent online logging
-        cfg.logging.wandb.mode = "offline"
+    #For each image, apply each augmentation
+    for i in range(x.size()[0]):
+        all_embed_img = torch.tensor([])    #A tensor to hold embeddings of all augmentations of an image
+        #print('Image: ', i+1)
 
-    # Hydra run directory
-    hydra_dir = Path(HydraConfig.get().run.dir)
+        for aug in aug_list:
+            #print("Augmentation: ", aug)
+            preprocess = T.Compose([T.ToPILImage(), aug, T.ToTensor()])
+            aug_img = preprocess(x[i])
+            embedding = encoder(aug_img.unsqueeze(0))
 
-    # Instantiate datamodule
-    hydra.utils.log.info(f"Instantiating <{cfg.data.datamodule._target_}>")
-    datamodule: pl.LightningDataModule = hydra.utils.instantiate(
-        cfg.data.datamodule, _recursive_=False
-    )
+            all_embed_img = torch.cat((all_embed_img,
+                                    embedding), 0)
 
-    # Instantiate model
-    hydra.utils.log.info(f"Instantiating <{cfg.model._target_}>")
-    model: pl.LightningModule = hydra.utils.instantiate(
-        cfg.model,
-        optim=cfg.optim,
-        data=cfg.data,
-        logging=cfg.logging,
-        _recursive_=False,
-    )
+        all_embeddings = torch.cat((all_embeddings,
+                                    torch.mean(all_embed_img, 0)), 0)
 
-    # Instantiate the callbacks
-    callbacks: List[Callback] = build_callbacks(cfg=cfg)
+        #print('\n')
 
-    # Logger instantiation/configuration
-    wandb_logger = None
-    if "wandb" in cfg.logging:
-        hydra.utils.log.info(f"Instantiating <WandbLogger>")
-        wandb_config = cfg.logging.wandb
-        wandb_logger = WandbLogger(
-            **wandb_config,
-            tags=cfg.core.tags,
-        )
-        hydra.utils.log.info(f"W&B is now watching <{cfg.logging.wandb_watch.log}>!")
-        wandb_logger.watch(
-            model,
-            log=cfg.logging.wandb_watch.log,
-            log_freq=cfg.logging.wandb_watch.log_freq,
-        )
+final_dataset_embeddings = torch.reshape(all_embeddings, (ds.num_samples, embedding.size()[1]))
 
-    # Store the YaML config separately into the wandb dir
-    yaml_conf: str = OmegaConf.to_yaml(cfg=cfg)
-    (Path(wandb_logger.experiment.dir) / "hparams.yaml").write_text(yaml_conf)
-
-    hydra.utils.log.info(f"Instantiating the Trainer")
-
-    # The Lightning core, the Trainer
-    trainer = pl.Trainer(
-        default_root_dir=hydra_dir,
-        logger=wandb_logger,
-        callbacks=callbacks,
-        deterministic=cfg.train.deterministic,
-        val_check_interval=cfg.logging.val_check_interval,
-        progress_bar_refresh_rate=cfg.logging.progress_bar_refresh_rate,
-        **cfg.train.pl_trainer,
-    )
-    log_hyperparameters(trainer=trainer, model=model, cfg=cfg)
-
-    hydra.utils.log.info(f"Starting training!")
-    trainer.fit(model=model, datamodule=datamodule)
-
-    hydra.utils.log.info(f"Starting testing!")
-    trainer.test(datamodule=datamodule)
-
-    # Logger closing to release resources/avoid multi-run conflicts
-    if wandb_logger is not None:
-        wandb_logger.experiment.finish()
-
-
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
-def main(cfg: omegaconf.DictConfig):
-    run(cfg)
-
-
-if __name__ == "__main__":
-    main()
+print(final_dataset_embeddings.size()) 

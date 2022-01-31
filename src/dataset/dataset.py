@@ -23,7 +23,7 @@ def CIFAR10_dataset(train_transforms, test_transforms, download_dir='../../data'
 
     return (train_set, test_set)
 
-def get_dummy_dataset(input_shape=(224, 224, 3), label_shape=(1,), num_samples=100):
+def get_dummy_dataset(input_shape=(3, 224, 224), label_shape=(1,), num_samples=100):
     dummy_ds = DummyDataset(input_shape, label_shape, num_samples=num_samples)
 
     return dummy_ds
