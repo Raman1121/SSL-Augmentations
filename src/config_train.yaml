@@ -1,0 +1,8 @@
+model:
+  encoder: 'resnet50_supervised'
+training:
+  batch_size: 64
+  num_aug_samples: 10
+  verbose: True
+dataset:
+  num_samples: 5

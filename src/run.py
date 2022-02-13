@@ -19,18 +19,35 @@ from torch.utils.data import DataLoader
 
 from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
+
 from pytorch_lightning import Trainer
 from pl_bolts.datasets import DummyDataset
 
 from dataset import dataset
 from model import model
 
-parser = argparse.ArgumentParser(description='Hyper-parameters management')
+import yaml
+from pprint import pprint
 
-parser.add_argument('--num_samples', type=int, default=5, help='Number of samples in a dataset')
-parser.add_argument('--batch_size', type=int, default=64, help='Batch Size')
-parser.add_argument('--num_aug_samples', type=int, default=10, help='Number of times you want to sample an augmentation')
-parser.add_argument('--encoder', type=str, default='resnet50_supervised', help='Encoder Model')
+# parser = argparse.ArgumentParser(description='Hyper-parameters management')
+
+# parser.add_argument('--num_samples', type=int, default=5, help='Number of samples in a dataset')
+# parser.add_argument('--batch_size', type=int, default=64, help='Batch Size')
+# parser.add_argument('--num_aug_samples', type=int, default=10, help='Number of times you want to sample an augmentation')
+# parser.add_argument('--encoder', type=str, default='resnet50_supervised', help='Encoder Model')
+
+with open('config_train.yaml') as file:
+    yaml_data = yaml.safe_load(file)
+
+#################### DEFINE CONSTANTS ####################
+
+ENCODER = yaml_data['model']['encoder']
+BATCH_SIZE = yaml_data['training']['batch_size']    #Batch size of the dataset
+NUM_AUG_SAMPLES = yaml_data['training']['num_aug_samples'] #Number of times to sample an augmentation
+NUM_DUMMY_SAMPLES = yaml_data['dataset']['num_samples']
+VERBOSE = yaml_data['training']['verbose']
+
+##########################################################
 
 aug_dict = {'RandomGrayscale': T.RandomGrayscale(p=0.2),
             'HorizontalFLip': T.RandomHorizontalFlip(),
@@ -42,14 +59,11 @@ aug_dict = {'RandomGrayscale': T.RandomGrayscale(p=0.2),
 * Final output for a dataset should have size [num_samples, embedding_size]
 * 'embedding_size' depends on the encoder used. [ResNet, SimCLR = 2048, ViTs = 768]
 '''
-args = parser.parse_args()
+                       
 
-BATCH_SIZE = args.batch_size                       #Batch size of the dataset
-num_sample_aug = args.num_aug_samples              #Number of times to sample an augmentation.
-
-ds = dataset.get_dummy_dataset(num_samples=args.num_samples)
+ds = dataset.get_dummy_dataset(num_samples=NUM_DUMMY_SAMPLES)
 dl = DataLoader(ds, batch_size=BATCH_SIZE)
-encoder = model.Encoder(encoder=args.encoder)
+encoder = model.Encoder(encoder=ENCODER)
 
 all_embeddings = torch.tensor([])   #A tensor to hold mean embeddings of all images in a dataset
 final_dataset_embeddings = torch.tensor([]) #A tensor holding mean embeddings for all images in a dataset but reshaped to correct dimensions
@@ -82,7 +96,7 @@ for x, y in dl:
             FOR EACH SAMPLE OF AN AUGMENTATION
             [Sampling an augmentation]
             '''
-            for k in range(num_sample_aug):
+            for k in range(NUM_AUG_SAMPLES):
                 
                 #print("Sample number for this augmentation: ", k)
                 preprocess = T.Compose([T.ToPILImage(), aug, T.ToTensor()])
