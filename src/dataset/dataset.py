@@ -1,29 +1,65 @@
-from torchvision.datasets import CIFAR10
-from torch.utils.data import DataLoader
-import torchvision.transforms as T
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms as T
+from torchvision.io import read_image
+import pytorch_lightning as pl
 
-from pl_bolts.models.self_supervised import SimCLR
-from pytorch_lightning.core.lightning import LightningModule
-from pl_bolts.datasets import DummyDataset
+import yaml
 
-def CIFAR10_dataset(train_transforms, test_transforms, download_dir='../../data'):
+class RetinopathyDataset(Dataset):
+    def __init__(self, df, transforms=None):
+        """
+            Parameters
+            ----------
+            df : pandas.core.frame.DataFrame
+                Dataframe containing image paths ['image'], retinopathy level ['level'], and image quality scores ['score']
+            transforms : torchvision.transforms.transforms.Compose, default: None
+                A list of torchvision transformers to be applied to the training images.
+        """
 
-    if(train_transforms == None):
-        train_transforms = T.Compose([T.ToTensor()])
+        self.df = df
+        self.transforms = transforms
 
-    if(test_transforms == None):
-        test_transforms = T.Compose([T.ToTensor()])
+    def __len__(self,):
+        """
+            Returns
+            -------
 
-    train_set = CIFAR10(download_dir, download=True,
-                        transform=train_transforms)
+            Number of samples in our dataset.
+        """
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        """
+            Parameters
+            ----------
+            idx: index to identify a sample in the dataset
+
+            Returns
+            -------
+            An image and a label from the dataset based on the given index idx.
+        """
+        image = read_image(self.df['image'][idx])
+        label = self.df['level'][idx]
+
+        if(self.transforms):
+            image = self.transforms(image)
+
+        return image, label
 
 
-    test_set = CIFAR10(download_dir, download=True,
-                        transform=test_transforms, train=False)
+class CheXpertDataset(Dataset):
+    def __init__(self, df, transforms):
+        self.df = df
+        self.transforms = transforms
+    
+    def __len__(self):
+        return len(self.df)
 
-    return (train_set, test_set)
+    def __getitem__(self, idx):
+        image = read_image(self.df['Path'][idx])
+        #label = ....
 
-def get_dummy_dataset(input_shape=(3, 224, 224), label_shape=(1,), num_samples=100):
-    dummy_ds = DummyDataset(input_shape, label_shape, num_samples=num_samples)
+        if(self.transforms):
+            image = self.transforms(image)
 
-    return dummy_ds
+        return image, label
