@@ -23,7 +23,8 @@ from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning import Trainer
 from pl_bolts.datasets import DummyDataset
 
-from dataset import dataset
+#from dataset import dataset
+from utils import utils
 from model import model
 
 import yaml
@@ -55,7 +56,7 @@ aug_dict = {'RandomGrayscale': T.RandomGrayscale(p=0.2),
 '''
                        
 
-ds = dataset.get_dummy_dataset(num_samples=NUM_DUMMY_SAMPLES)
+ds = utils.get_dummy_dataset(num_samples=NUM_DUMMY_SAMPLES)
 dl = DataLoader(ds, batch_size=BATCH_SIZE)
 encoder = model.Encoder(encoder=ENCODER)
 
@@ -119,3 +120,12 @@ for x, y in dl:
 final_dataset_embeddings = torch.reshape(all_embeddings, (ds.num_samples, embedding.size()[1])) #Final reshaping for all images in a dataset.
 
 print(final_dataset_embeddings.size()) 
+
+
+
+'''
+1. Select an image
+2. Perform all augmentations on that image k times
+3. Calculate the mean of all the embeddings generated
+
+'''
