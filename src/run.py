@@ -31,7 +31,7 @@ import yaml
 from pprint import pprint
 
 
-with open('config_train.yaml') as file:
+with open('../conf/config_run.yaml') as file:
     yaml_data = yaml.safe_load(file)
 
 #################### DEFINE CONSTANTS ####################
@@ -44,9 +44,19 @@ VERBOSE = yaml_data['training']['verbose']
 
 ##########################################################
 
-aug_dict = {'RandomGrayscale': T.RandomGrayscale(p=0.2),
-            'HorizontalFLip': T.RandomHorizontalFlip(),
-            'ColorJitter':T.ColorJitter(0.4, 0.4, 0.4, 0.1)}
+# aug_dict = {'RandomGrayscale': T.RandomGrayscale(p=0.2),
+#             'HorizontalFLip': T.RandomHorizontalFlip(),
+#             'ColorJitter':T.ColorJitter(0.4, 0.4, 0.4, 0.1)}
+
+imagenet_mean_std = [[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]]
+gaussian_blur = utils.GaussianBlur([.1, 2.])
+unnormalize = utils.UnNormalize(*imagenet_mean_std)
+
+
+aug_dict = {'ColorJitter': T.ColorJitter(0.4, 0.4, 0.4, 0.1),
+            'RandomGrayScale': T.RandomGrayscale(p=0.2),
+            'GaussianBlur': T.RandomApply([gaussian_blur], p=0.5)
+            }
 
 
 '''
