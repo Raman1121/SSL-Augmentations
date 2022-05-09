@@ -6,5 +6,5 @@
 #SBATCH --account BMAI-CDT-SL2-GPU
 #SBATCH --time=5:00:00
 
-python test.py
+python train_LR_embeddings.py
 
