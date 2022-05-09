@@ -2,4 +2,6 @@ src/notebooks/cifar-10-python.tar.gz
 src/notebooks/cifar-10-batches-py
 data/
 src/saved_models/
-src/embeddings/
+Embeddings/
+Saved_models/
+src/lightning_logs/

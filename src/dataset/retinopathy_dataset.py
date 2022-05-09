@@ -28,9 +28,12 @@ class RetinopathyDataset(Dataset):
 
         if(self.subset != None):
             print("Creating a subset of {} samples".format(self.subset))
-            #TODO: Add logic to create a random subset of the dataset
+            
             subset_list = random.sample(range(len(self.df)), self.subset)
             self.df = self.df.iloc[subset_list].reset_index(drop=True)
+
+        else:
+            print("Creating the entire dataset.")
 
         self.df = self.df.loc[self.df['quality'].isin(self.cat_labels)].reset_index(drop=True)
 
@@ -55,11 +58,12 @@ class RetinopathyDataset(Dataset):
         """
         image = read_image(self.df['image'][idx])
         label = self.df['level'][idx]
+        filename = self.df['image'][idx].split('/')[-1]
 
         if(self.transforms):
             image = self.transforms(image)
 
-        return image, label
+        return image, label, filename
 
 
 class LightningRetinopathyDataset(pl.LightningDataModule):

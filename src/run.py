@@ -106,8 +106,8 @@ elif(USE_DATASET == 'mura'):
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
 utils.check_data_loader(train_loader)
 
-# encoder = model.Encoder(encoder=ENCODER)
+encoder = model.Encoder(encoder=ENCODER)
 
-# final_dataset_embeddings = utils.run_one_aug(dl, encoder, aug_dict, NUM_DUMMY_SAMPLES, NUM_AUG_SAMPLES)
+final_dataset_embeddings = utils.run_one_aug(train_loader, encoder, aug_dict, NUM_DUMMY_SAMPLES, NUM_AUG_SAMPLES)
 
-# print(final_dataset_embeddings.size()) 
+print(final_dataset_embeddings.size()) 

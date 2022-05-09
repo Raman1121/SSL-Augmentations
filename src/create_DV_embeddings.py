@@ -24,6 +24,10 @@ from pprint import pprint
 
 from moco import MoCo
 
+import argparse
+import warnings
+import shutil
+
 
 imagenet_mean_std = [[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]]
 
@@ -404,9 +408,18 @@ if __name__ == '__main__':
     with open('../conf/config_DV.yaml') as file:
         yaml_data = yaml.safe_load(file)
 
-    pprint(yaml_data)
+    parser = argparse.ArgumentParser(description='Hyper-parameters management')
+    parser.add_argument('--create_embd_for', type=str, default='train', help='The dataset for which embeddings are to be created (train/ test)')
+    parser.add_argument('--subset', type=int, default=None, help='Number of subset samples to be created')
+    parser.add_argument('--remove_existing_dataset', type=bool, default=False, help='Whether to create existing dataset')
+    parser.add_argument('--model', type=str, default='dorsal', help='Which model to use for creating embeddings (dorsal/ ventral)')
+
+    args = parser.parse_args()
 
     #################### DEFINE CONSTANTS ####################
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
     #DATASET CONSTANTS
     DATASET_ROOT_PATH = yaml_data['datasets']['retinopathy_dataset']['root_path']
@@ -417,17 +430,31 @@ if __name__ == '__main__':
     TRAIN_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['train_cat_labels']
     VAL_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['val_cat_labels']
     TEST_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['test_cat_labels']
-    SUBSET = yaml_data['datasets']['retinopathy_dataset']['subset']
+    SUBSET = args.subset
 
-    #TRAIN CONSTANTS
-    BATCH_SIZE = yaml_data['train']['batch_size']
-    MODEL = yaml_data['train']['model']
+    #RUN CONSTANTS
+    BATCH_SIZE = yaml_data['run']['batch_size']
+    MODEL = args.model
+    DATASET = yaml_data['run']['dataset']
+    CREATE_EMBEDDINGS_FOR = args.create_embd_for
+    REMOVE_EXISTING_DATASET = args.remove_existing_dataset
+
+
+    #SAVING CONSTANTS
+    EMBEDDING_SAVE_DIR = '../Embeddings'
+    SAVED_MODELS_DIR = '../Saved_models'
+
+    pprint(yaml_data)
+    print("Model: ", MODEL)
+    print("SUBSET: ", SUBSET)
+    print("REMOVE_EXISTING_DATASET: ", REMOVE_EXISTING_DATASET)
+
+    #######################################################################################
 
     train_transform = T.Compose([
         T.ToPILImage(),
         T.Resize((224,224)),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        T.ToTensor()
     ])
 
     main_df = pd.read_csv(TRAIN_DF_PATH)
@@ -437,58 +464,75 @@ if __name__ == '__main__':
     test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
 
     # Creating training and validation splits
-    train_df, val_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                        random_state=SEED)
+    # train_df, val_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+    #                                     random_state=SEED)
 
-    train_df = train_df.reset_index(drop=True)
-    val_df = val_df.reset_index(drop=True)
-
-    print("Length of Main dataset: ", len(main_df))
-
-    #Creating Datasets
-    train_dataset = retinopathy_dataset.RetinopathyDataset(df=train_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-
-    val_dataset = retinopathy_dataset.RetinopathyDataset(df=val_df, cat_labels_to_include=VAL_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-
-    test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=train_transform)
-
-    print("Length of Training dataset: ", train_dataset.__len__())
-    print("Length of Validation dataset: ", val_dataset.__len__())
-    print("Length of Test dataset: ", test_dataset.__len__())
-
-    train_loader = DataLoader(train_dataset, batch_size=yaml_data['train']['batch_size'], shuffle=True, num_workers=12)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-
-    dm = retinopathy_dataset.LightningRetinopathyDataset(train_dataset, val_dataset,
-                                                        test_dataset, BATCH_SIZE)
+    #train_df = train_df.reset_index(drop=True)
+    #val_df = val_df.reset_index(drop=True)
 
     #Loading pretrained DV Model
 
-    if(MODEL == 'dorsal'):
-        load_path = 'saved_models/dorsal.pth.tar'
-    elif(MODEL == 'ventral'):
-        load_path = 'saved_models/ventral.pth.tar'
-    elif(MODEL == 'default'):
-        load_path = 'saved_models/'
+    if(not os.path.exists(SAVED_MODELS_DIR)):
+        os.mkdir(SAVED_MODELS_DIR)
 
-    model = ImageNetModel(load_path)
+    try:
+        if(MODEL == 'dorsal'):
+            #load_path = 'saved_models/dorsal.pth.tar'
+            load_path = os.path.join(SAVED_MODELS_DIR, 'dorsal.pth.tar')
+        elif(MODEL == 'ventral'):
+            #load_path = 'saved_models/ventral.pth.tar'
+            load_path = os.path.join(SAVED_MODELS_DIR, 'ventral.pth.tar')
+        elif(MODEL == 'default'):
+            #load_path = 'saved_models/'
+            load_path = os.path.join(SAVED_MODELS_DIR, 'default.pth.tar')
+    except:
+        print("Error in loading models")
+
+    model = ImageNetModel(load_path, device=device)
     model.eval()
 
+    #Creating Datasets
+
+    if(CREATE_EMBEDDINGS_FOR == 'train'):
+        print("Creating embeddings for the train dataset")
+        dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+    elif(CREATE_EMBEDDINGS_FOR == 'test'):
+        print("Creating embeddings for the test dataset")
+        dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+
+    print("Length of dataset: ", dataset.__len__())
+    
+    loader = DataLoader(dataset, batch_size=yaml_data['run']['batch_size'], shuffle=True, num_workers=12)
+    
     #Creating embeddings for the dataset
     all_embeddings = torch.tensor([])
+    count = 0
 
-    for x, y in train_loader:
+    embeddings_save_path = os.path.join(EMBEDDING_SAVE_DIR, DATASET, CREATE_EMBEDDINGS_FOR, MODEL)    
+
+    if(os.path.exists(embeddings_save_path)):
+            if(REMOVE_EXISTING_DATASET):
+                warnings.warn("REMOVING EXISTING DATASET. THIS BEHAVIOUR SHOULD BE INTENDED!")
+                shutil.rmtree(embeddings_save_path)
+            
+                #Create the folder structure again
+                os.makedirs(embeddings_save_path)
+    else:    
+        os.makedirs(embeddings_save_path)
+
+    for x, y, filename in loader:
         outputs = model(x)
-        #print(type(outputs.detach().numpy()))
-        print(outputs.shape)
-        #all_embeddings.append(outputs.detach().numpy())
-        all_embeddings = torch.cat((all_embeddings, outputs), 0)
+        outputs = outputs.detach().numpy()
+    
+        filename = filename[0].split('.')[0]
+        
+        #all_embeddings = torch.cat((all_embeddings, outputs), 0)
 
+        count += BATCH_SIZE
 
-    all_embeddings_np = all_embeddings.detach().numpy()
-    embeddings_save_path = 'embeddings/retinopathy_'+MODEL
-    np.save(embeddings_save_path, all_embeddings_np)
+        #all_embeddings_np = all_embeddings.detach().numpy()
+        
+        print("Saving the Embedding: {} | Count: {}".format(filename, count))
+        np.save(os.path.join(embeddings_save_path, filename), outputs)

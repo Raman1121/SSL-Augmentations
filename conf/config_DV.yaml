@@ -1,15 +1,14 @@
 datasets:
   retinopathy_dataset:
-    root_path: '/home/raman/MLP-RIQA/data/diabetic-retinopathy-detection/' #Root path to the images
-    train_df_path: '/home/raman/MLP-RIQA/Train_set_RIQA_DR_Labels.csv'  #Path to read the training dataset file
-    test_df_path: '/home/raman/MLP-RIQA/Test_set_RIQA_DR_Labels.csv' #Path to read the test dataset file
+    root_path: '/home/co-dutt1/rds/hpc-work/MLP-RIQA/data/diabetic-retinopathy-detection/' #Root path to the images
+    train_df_path: '/home/co-dutt1/rds/hpc-work/MLP-RIQA/Train_set_RIQA_DR_Labels.csv'  #Path to read the training dataset file
+    test_df_path: '/home/co-dutt1/rds/hpc-work/MLP-RIQA/Test_set_RIQA_DR_Labels.csv' #Path to read the test dataset file
 
     train_cat_labels: ['Good', 'Usable', 'Reject']
     test_cat_labels: ['Good', 'Usable', 'Reject']
     val_cat_labels: ['Good', 'Usable', 'Reject']
 
-    subset: 100
-
-train:
-  batch_size: 32
-  model: 'ventral'
+run:
+  batch_size: 1
+  model: 'dorsal'
+  dataset: 'retinopathy'

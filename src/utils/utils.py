@@ -5,7 +5,7 @@ import torchvision.transforms as T
 from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 from pl_bolts.datasets import DummyDataset
-from dataset import dataset
+from dataset import retinopathy_dataset
 
 import torch
 import os
@@ -60,8 +60,8 @@ def load_DR_dataset(yaml_data, train_transforms, test_transforms):
     train_df['image'] = train_df['image'].apply(lambda x: str(ROOT_PATH+'final_train/train/'+x))
     test_df['image'] = test_df['image'].apply(lambda x: str(ROOT_PATH+'final_test/test/'+x))
 
-    train_dataset = dataset.RetinopathyDataset(df=train_df, transforms=train_transforms)
-    test_dataset = dataset.RetinopathyDataset(df=test_df, transforms=test_transforms)
+    train_dataset = retinopathy_dataset.RetinopathyDataset(df=train_df, transforms=train_transforms)
+    test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, transforms=test_transforms)
     
     return train_dataset, test_dataset
 
