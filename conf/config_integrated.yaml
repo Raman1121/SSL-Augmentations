@@ -8,7 +8,13 @@ datasets:
     test_cat_labels: ['Good', 'Usable', 'Reject']
     val_cat_labels: ['Good', 'Usable', 'Reject']
 
+    num_classes: 5
+
 run:
   batch_size: 256
   model: 'dorsal'
   dataset: 'retinopathy'
+  lr_rate: 0.1
+  epochs: 50
+  
+

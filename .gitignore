@@ -5,3 +5,4 @@ src/saved_models/
 Embeddings/
 Saved_models/
 src/lightning_logs/
+src/slurm*

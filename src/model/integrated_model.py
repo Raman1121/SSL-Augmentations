@@ -12,14 +12,13 @@ from torch.optim.lr_scheduler import CyclicLR, CosineAnnealingLR, ReduceLROnPlat
 
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
 
-class LogisticRegression(LightningModule):
-    def __init__(self, input_dim, output_dim, batch_size, learning_rate = 0.0001, device='cuda', lr_scheduler='none'):
-        #super(LogisticRegression, self).__init__()
+class IntegratedModel(LightningModule):
+    def __init__(self, input_dim, output_dim, batch_size, encoder, learning_rate = 0.0001, device='cuda', lr_scheduler='none'):
+
         super().__init__()
         self.linear = torch.nn.Linear(input_dim, output_dim)
+        self.encoder = encoder
 
         self.criterion = nn.CrossEntropyLoss()
         self.learning_rate = learning_rate
@@ -29,40 +28,30 @@ class LogisticRegression(LightningModule):
         self.loss_sublist = np.array([])
         self.acc_sublist = np.array([])
         
+        self.encoder.eval()
         self.model = nn.Sequential(self.linear)
 
-    
-    def forward(self, x):
-        outputs = self.model(x)
-        return outputs
-    
+        for p in self.encoder.parameters():
+            p.requires_grad = False
 
     def training_step(self, batch, batch_idx):
-        embedding, labels, filename = batch
-        embedding, labels = embedding.squeeze(1), labels    #[batch_size, input_dim], [batch_size, 1]
-        labels = labels.to(torch.int64)
+        image, labels, filename = batch
 
-        print(embedding.shape)
+        #Pass through the encoder to create the embedding
+        embedding = self.encoder(image)                #[batch_size, input_dim]
+        labels = torch.unsqueeze(labels, 1)     #[batch_size, 1]
 
-        #Forward pass through the model
+        #Forward pass through the Linear Layer
         outputs = self.model(embedding)         # [Batch_Size, Num_classes]
-        
-        #Calculate loss
+
+        #Calculate Loss
         loss = self.criterion(outputs, labels.squeeze(1))
 
-        #Calculate and log training metrics
-
-        #preds = torch.exp(outputs.cpu().data)/torch.sum(torch.exp(outputs.cpu().data))
+        #Predictions
         preds = torch.softmax(outputs, dim=1)
 
-        #preds = torch.argmax(outputs, dim=1)
-        #print("Labels: ", labels)
-        #print("Predictions: ", preds)
-        #print("Unique Predictions: ", np.unique(preds.cpu().numpy()))
-
-        
         acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int')
-        
+
         self.loss_sublist = np.append(self.loss_sublist, loss.cpu().detach().numpy())
         self.acc_sublist = np.append(self.acc_sublist, acc, axis=0)
         
@@ -79,22 +68,25 @@ class LogisticRegression(LightningModule):
         print("\n")
 
     def test_step(self, batch, batch_idx):
-        test_embd, test_labels, filename = batch
-        #test_embd, test_labels = test_embd.to(self.device).squeeze(1), test_labels.to(self.device)
-        test_embd, test_labels = test_embd.squeeze(1), test_labels
-        test_labels = test_labels.to(torch.int64)
+        image, labels, filename = batch
 
-        test_output = self.model(test_embd) 
+        #Pass through the encoder to create the embedding
+        embedding = self.encoder(image)                #[batch_size, input_dim]
+        labels = torch.unsqueeze(labels, 1)            #[batch_size, 1]
 
-        test_loss = self.criterion(test_output, test_labels.squeeze(1))
+        #Forward pass through the Linear Layer
+        outputs = self.model(embedding)         # [Batch_Size, Num_classes]
 
-        #Calculate and log training metrics
-        test_preds = torch.argmax(test_output, dim=1)
-        test_acc = torchmetrics.functional.accuracy(test_preds, torch.squeeze(test_labels, dim=1))
+        #Calculate Loss
+        loss = self.criterion(outputs, labels.squeeze(1))
+
+        preds = torch.softmax(outputs, dim=1)
+
+        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int')
 
         #Logging metrics
-        self.log('test_loss', test_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('test_acc', test_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('test_acc', torch.from_numpy(acc), on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return test_loss
 
@@ -114,5 +106,8 @@ class LogisticRegression(LightningModule):
 
 
 
-        
+
+
+
+
 

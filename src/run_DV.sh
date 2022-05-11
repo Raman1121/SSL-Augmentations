@@ -6,6 +6,6 @@
 #SBATCH --account BMAI-CDT-SL2-GPU
 #SBATCH --time=5:00:00
 
-python create_DV_embeddings.py --create_embd_for train --model dorsal --remove_existing_dataset True 
+python create_DV_embeddings.py --create_embd_for test --model ventral --remove_existing_dataset True --subset 1000
 
 

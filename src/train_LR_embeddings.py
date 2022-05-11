@@ -26,7 +26,7 @@ test_folder_path = os.path.join(root_path, dataset, 'test', model)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 BATCH_SIZE = 256
-lr_rate = 0.01
+lr_rate = 0.1
 EPOCHS = 100
 NUM_CLASSES = 5
 EMBEDDINGS_DIM = 2048
@@ -39,7 +39,9 @@ test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num
 
 print(len(train_dataset))
 
-logreg_model_pl = logReg_PL.LogisticRegression(EMBEDDINGS_DIM, NUM_CLASSES, lr_rate, lr_scheduler='reduce_plateau')
+logreg_model_pl = logReg_PL.LogisticRegression(input_dim=EMBEDDINGS_DIM, output_dim=NUM_CLASSES, 
+                                                learning_rate = lr_rate, batch_size=BATCH_SIZE, 
+                                                lr_scheduler='reduce_plateau')
 
 trainer = pl.Trainer(gpus=1, 
                     max_epochs=EPOCHS)
