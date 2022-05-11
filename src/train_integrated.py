@@ -415,7 +415,7 @@ if __name__ == '__main__':
         yaml_data = yaml.safe_load(file)
 
     parser = argparse.ArgumentParser(description='Hyper-parameters management')
-    #parser.add_argument('--subset', type=int, default=None, help='Number of subset samples to be created')
+    parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
     parser.add_argument('--model', type=str, default='dorsal', help='Which model to use for creating embeddings (dorsal/ ventral)')
     parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 
@@ -433,7 +433,7 @@ if __name__ == '__main__':
     #RUN CONSTANTS
     BATCH_SIZE = yaml_data['run']['batch_size']
     MODEL = args.model
-    DATASET = yaml_data['run']['dataset']
+    DATASET = args.dataset
     lr_rate = yaml_data['run']['lr_rate']
     EPOCHS = yaml_data['run']['epochs']
     EXPERIMENTAL_RUN = args.experimental_run
@@ -456,6 +456,7 @@ if __name__ == '__main__':
 
 
     pprint(yaml_data)
+    print("Dataset: ", DATASET)
     print("Model: ", MODEL)
     print("SUBSET: ", SUBSET)
     print("Saved Models dir: ", SAVED_MODELS_DIR)

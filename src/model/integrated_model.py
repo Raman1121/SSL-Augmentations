@@ -38,7 +38,7 @@ class IntegratedModel(LightningModule):
         image, labels = batch
 
         #Pass through the encoder to create the embedding
-        embedding = self.encoder(image)                #[batch_size, input_dim]
+        embedding = self.encoder(image)         #[batch_size, input_dim]
         labels = torch.unsqueeze(labels, 1)     #[batch_size, 1]
 
         #Forward pass through the Linear Layer
@@ -50,20 +50,21 @@ class IntegratedModel(LightningModule):
         #Predictions
         preds = torch.softmax(outputs, dim=1)
 
-        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int')
+        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / embedding.size(0)
 
-        self.loss_sublist = np.append(self.loss_sublist, loss.cpu().detach().numpy())
-        self.acc_sublist = np.append(self.acc_sublist, acc, axis=0)
+        #self.loss_sublist = np.append(self.loss_sublist, loss.cpu().detach().numpy())
+        #self.acc_sublist = np.append(self.acc_sublist, acc, axis=0)
         
         #Logging metrics
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
-        self.log('train_acc', torch.from_numpy(acc), on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        #self.log('train_acc', torch.from_numpy(acc), on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return loss
 
     def training_epoch_end(self, training_step_outputs):
         
-        print("Train acc: {} | Train Loss: {}".format(np.mean(self.acc_sublist), np.mean(self.loss_sublist)))
+        #print("Train acc: {} | Train Loss: {}".format(np.mean(self.acc_sublist), np.mean(self.loss_sublist)))
         
         print("\n")
 
@@ -82,11 +83,11 @@ class IntegratedModel(LightningModule):
 
         preds = torch.softmax(outputs, dim=1)
 
-        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int')
+        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / embedding.size(0)
 
         #Logging metrics
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
-        self.log('test_acc', torch.from_numpy(acc), on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return loss
 
