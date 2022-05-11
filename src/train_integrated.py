@@ -5,7 +5,7 @@ from glob import glob
 import pandas as pd
 import numpy as np
 
-from dataset import retinopathy_dataset
+from dataset import retinopathy_dataset, cancer_mnist_dataset
 from model import integrated_model
 
 import torch
@@ -415,8 +415,9 @@ if __name__ == '__main__':
         yaml_data = yaml.safe_load(file)
 
     parser = argparse.ArgumentParser(description='Hyper-parameters management')
-    parser.add_argument('--subset', type=int, default=None, help='Number of subset samples to be created')
+    #parser.add_argument('--subset', type=int, default=None, help='Number of subset samples to be created')
     parser.add_argument('--model', type=str, default='dorsal', help='Which model to use for creating embeddings (dorsal/ ventral)')
+    parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 
     args = parser.parse_args()
 
@@ -424,33 +425,40 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
-    #DATASET CONSTANTS
-    DATASET_ROOT_PATH = yaml_data['datasets']['retinopathy_dataset']['root_path']
-    TRAIN_DF_PATH = yaml_data['datasets']['retinopathy_dataset']['train_df_path']
-    TEST_DF_PATH = yaml_data['datasets']['retinopathy_dataset']['test_df_path']
-    VALIDATION_SPLIT = 0.3
-    SEED = 42
-    TRAIN_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['train_cat_labels']
-    VAL_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['val_cat_labels']
-    TEST_CAT_LABELS = yaml_data['datasets']['retinopathy_dataset']['test_cat_labels']
-    NUM_CLASSES = yaml_data['datasets']['retinopathy_dataset']['num_classes']
-    SUBSET = args.subset
-
+    if(device == torch.device(type='cpu')):
+        GPUs = 0
+    elif(device == torch.device(type='cuda')):
+        GPUs = 1
+    
     #RUN CONSTANTS
     BATCH_SIZE = yaml_data['run']['batch_size']
     MODEL = args.model
     DATASET = yaml_data['run']['dataset']
     lr_rate = yaml_data['run']['lr_rate']
     EPOCHS = yaml_data['run']['epochs']
+    EXPERIMENTAL_RUN = args.experimental_run
     EMBEDDINGS_DIM = 2048
+    SUBSET = yaml_data['run']['subset']
+
+    #DATASET CONSTANTS
+    DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
+    TRAIN_DF_PATH = yaml_data['all_datasets'][DATASET]['train_df_path']
+    VALIDATION_SPLIT = 0.3
+    SEED = 42
+    NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
+    
 
     #SAVING CONSTANTS
     SAVED_MODELS_DIR = '../Saved_models'
 
+    if(EXPERIMENTAL_RUN):
+        EPOCHS = 1
+
+
     pprint(yaml_data)
     print("Model: ", MODEL)
     print("SUBSET: ", SUBSET)
+    print("Saved Models dir: ", SAVED_MODELS_DIR)
 
     #######################################################################################
 
@@ -460,11 +468,57 @@ if __name__ == '__main__':
         T.ToTensor()
     ])
 
+    #Load the train set
     main_df = pd.read_csv(TRAIN_DF_PATH)
-    test_df = pd.read_csv(TEST_DF_PATH)
 
-    main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
-    test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
+    ##################################### DATASETS #######################################
+
+    train_dataset = None
+    test_dataset = None
+
+    if(DATASET == 'retinopathy'):
+
+        '''
+        Preparing the Diabetic Retinopathy dataset
+        '''
+        
+        #Load the test set for DR dataset
+        TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
+        test_df = pd.read_csv(TEST_DF_PATH)
+
+        TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
+        VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
+        TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
+
+        main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
+        test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
+
+        train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+
+        test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+
+    elif(DATASET == 'cancer_mnist'):
+
+        '''
+        Preparing the Cancer MNIST dataset
+        '''
+
+        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=main_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+        #NOTE: Test data for this dataset has not been provided!
+
+
+    elif(DATASET == 'chexpert'):
+        pass
+
+    elif(DATASET == 'mura'):
+        pass                                          
+
+
+    #######################################################################################
 
     try:
         if(MODEL == 'dorsal'):
@@ -481,27 +535,26 @@ if __name__ == '__main__':
 
     encoder_model = ImageNetModel(load_path, device=device)
 
-    #Creating Datasets
-
-    
-    train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-    test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-    
-    train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
-    test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+    #Creating Data Loaders
+    if(train_dataset != None):
+        train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+    if(test_dataset != None):
+        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
 
 
     integrated_model = integrated_model.IntegratedModel(input_dim=EMBEDDINGS_DIM, output_dim=NUM_CLASSES, encoder=encoder_model,
                                                         learning_rate = lr_rate, batch_size=BATCH_SIZE, 
                                                         lr_scheduler='reduce_plateau')
 
-    trainer = pl.Trainer(gpus=1, 
+    trainer = pl.Trainer(gpus=GPUs, 
                     max_epochs=EPOCHS)
 
     trainer.fit(integrated_model, train_image_loader)
-    trainer.test(dataloaders=test_image_loader)
+
+    if(test_dataset != None):
+        trainer.test(dataloaders=test_image_loader)
+    else:
+        print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
 
 
 

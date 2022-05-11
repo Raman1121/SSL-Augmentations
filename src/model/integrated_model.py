@@ -35,7 +35,7 @@ class IntegratedModel(LightningModule):
             p.requires_grad = False
 
     def training_step(self, batch, batch_idx):
-        image, labels, filename = batch
+        image, labels = batch
 
         #Pass through the encoder to create the embedding
         embedding = self.encoder(image)                #[batch_size, input_dim]
@@ -68,7 +68,7 @@ class IntegratedModel(LightningModule):
         print("\n")
 
     def test_step(self, batch, batch_idx):
-        image, labels, filename = batch
+        image, labels = batch
 
         #Pass through the encoder to create the embedding
         embedding = self.encoder(image)                #[batch_size, input_dim]
@@ -88,7 +88,7 @@ class IntegratedModel(LightningModule):
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('test_acc', torch.from_numpy(acc), on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return test_loss
+        return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -96,7 +96,7 @@ class IntegratedModel(LightningModule):
         if(self.lr_scheduler == 'none'):
             return optimizer
         elif(self.lr_scheduler == 'reduce_plateau'):
-            scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, min_lr=1e-6, patience=10, verbose=True)
+            scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, min_lr=1e-6, patience=6, verbose=True)
 
         return {"optimizer": optimizer, 
                 "lr_scheduler":{

@@ -4,11 +4,9 @@ from torchvision.io import read_image
 import pytorch_lightning as pl
 
 import random
-import yaml
 
-
-class RetinopathyDataset(Dataset):
-    def __init__(self, df, transforms=None, cat_labels_to_include=['Good', 'Usable', 'Reject'], subset=None):
+class CancerMNISTDataset(Dataset):
+    def __init__(self, df, transforms=None, subset=None):
 
         """
             Parameters
@@ -17,13 +15,10 @@ class RetinopathyDataset(Dataset):
                 Dataframe containing image paths ['image'], retinopathy level ['level'], and image quality scores ['continuous_score']
             transforms : torchvision.transforms.transforms.Compose, default: None
                 A list of torchvision transformers to be applied to the training images.
-            cat_labels_to_include : list, default: ['Good', 'Usable', 'Reject']
-                A list of categorical labels to be included in our dataset
         """
 
         self.df = df
         self.transforms = transforms
-        self.cat_labels = cat_labels_to_include
         self.subset = subset
 
         if(self.subset != None):
@@ -35,18 +30,20 @@ class RetinopathyDataset(Dataset):
         else:
             print("Creating the entire dataset.")
 
-        self.df = self.df.loc[self.df['quality'].isin(self.cat_labels)].reset_index(drop=True)
 
     def __len__(self):
+
         """
             Returns
             -------
 
             Number of samples in our dataset.
         """
+
         return len(self.df)
 
     def __getitem__(self, idx):
+
         """
             Parameters
             ----------
@@ -56,31 +53,11 @@ class RetinopathyDataset(Dataset):
             -------
             An image and a label from the dataset based on the given index idx.
         """
-        image = read_image(self.df['image'][idx])
-        label = self.df['level'][idx]
-        filename = self.df['image'][idx].split('/')[-1]
+
+        image = read_image(self.df['path'][idx])
+        label = self.df['cell_type_idx'][idx]
 
         if(self.transforms):
             image = self.transforms(image)
 
         return image, label
-
-
-class LightningRetinopathyDataset(pl.LightningDataModule):
-    def __init__(self, train_dataset, val_dataset, test_dataset, batch_size=32):
-        super().__init__()
-
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        self.test_dataset = test_dataset
-        self.batch_size = batch_size
-
-    def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=12, shuffle=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=12, shuffle=False)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=12, shuffle=False)
-    

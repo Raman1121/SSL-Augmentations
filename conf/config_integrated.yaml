@@ -1,5 +1,5 @@
-datasets:
-  retinopathy_dataset:
+all_datasets:
+  retinopathy:
     num_classes: 5
     root_path: '/home/co-dutt1/rds/hpc-work/MLP-RIQA/data/diabetic-retinopathy-detection/' #Root path to the images
     train_df_path: '/home/co-dutt1/rds/hpc-work/MLP-RIQA/Train_set_RIQA_DR_Labels.csv'  #Path to read the training dataset file
@@ -17,16 +17,17 @@ datasets:
   cancer_mnist:
     num_classes: 7
     root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/'
-    train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/HAM10000_metadata.csv'
+    train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/HAM10000_modified_metadata.csv'
 
   mura:
     root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/'
 
 run:
   batch_size: 256
-  model: 'dorsal'
   dataset: 'retinopathy'
   lr_rate: 0.1
-  epochs: 50
+  epochs: 30
+  subset: null
+
   
 

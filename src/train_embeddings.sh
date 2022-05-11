@@ -6,5 +6,5 @@
 #SBATCH --account BMAI-CDT-SL2-GPU
 #SBATCH --time=7:00:00
 
-python train_integrated.py --model default
+python train_integrated.py --model dorsal
 
