@@ -10,9 +10,10 @@ all_datasets:
     val_cat_labels: ['Good', 'Usable', 'Reject']
 
   chexpert:
+    num_classes: 2
     root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/'
-    train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/train.csv'
-    valid_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/valid.csv'
+    train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/train_final.csv'
+    val_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/valid_final.csv'
 
   cancer_mnist:
     num_classes: 7

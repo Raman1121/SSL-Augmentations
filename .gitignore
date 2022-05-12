@@ -7,3 +7,4 @@ Saved_models/
 src/lightning_logs/
 src/slurm*
 output_files/
+*.ckpt

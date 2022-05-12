@@ -5,7 +5,7 @@ from glob import glob
 import pandas as pd
 import numpy as np
 
-from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset
+from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
 from model import integrated_model
 
 import torch
@@ -454,6 +454,7 @@ if __name__ == '__main__':
 
     if(EXPERIMENTAL_RUN):
         EPOCHS = 1
+        AUTO_LR_FIND = False
 
 
     pprint(yaml_data)
@@ -523,7 +524,31 @@ if __name__ == '__main__':
                                                                 subset=SUBSET)
 
     elif(DATASET == 'chexpert'):
-        pass
+        '''
+        Preparing the CheXpert dataset
+        '''
+        #NOTE: Test data for this dataset has not been provided!
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        
+        train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
+                                                        subset=SUBSET)
+
+        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
+                                                        subset=SUBSET)
+
+        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
+                                                        subset=SUBSET)
+        
 
     elif(DATASET == 'mura'):
         '''
@@ -574,9 +599,9 @@ if __name__ == '__main__':
     if(train_dataset != None):
         train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
     if(test_dataset != None):
-        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
     if(val_dataset != None):
-        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
 
     integrated_model = integrated_model.IntegratedModel(input_dim=EMBEDDINGS_DIM, output_dim=NUM_CLASSES, encoder=encoder_model,
