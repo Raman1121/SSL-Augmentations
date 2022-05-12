@@ -20,13 +20,18 @@ all_datasets:
     train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/HAM10000_modified_metadata.csv'
 
   mura:
-    root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/'
+    num_classes: 2
+    root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/'
+    train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/train_paths_with_labels.csv'
+    val_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/valid_paths_with_labels.csv'
+
 
 run:
   batch_size: 256
   lr_rate: 0.1
   epochs: 30
   subset: null
+  auto_lr_find: True
 
   
 

@@ -5,7 +5,7 @@ from glob import glob
 import pandas as pd
 import numpy as np
 
-from dataset import retinopathy_dataset, cancer_mnist_dataset
+from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset
 from model import integrated_model
 
 import torch
@@ -439,6 +439,7 @@ if __name__ == '__main__':
     EXPERIMENTAL_RUN = args.experimental_run
     EMBEDDINGS_DIM = 2048
     SUBSET = yaml_data['run']['subset']
+    AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
 
     #DATASET CONSTANTS
     DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -476,6 +477,7 @@ if __name__ == '__main__':
 
     train_dataset = None
     test_dataset = None
+    val_dataset = None
 
     if(DATASET == 'retinopathy'):
 
@@ -506,31 +508,63 @@ if __name__ == '__main__':
         Preparing the Cancer MNIST dataset
         '''
 
-        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=main_df, transforms=train_transform, 
-                                                                subset=SUBSET)
-
         #NOTE: Test data for this dataset has not been provided!
 
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
+                                                                subset=SUBSET)
 
     elif(DATASET == 'chexpert'):
         pass
 
     elif(DATASET == 'mura'):
-        pass                                          
+        '''
+        Preparing the MURA dataset
+        '''
+
+        #NOTE: Test data for this dataset has not been provided!
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
+                                                                subset=SUBSET)
+
+        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+                                          
 
 
     #######################################################################################
 
     try:
         if(MODEL == 'dorsal'):
-            #load_path = 'saved_models/dorsal.pth.tar'
             load_path = os.path.join(SAVED_MODELS_DIR, 'dorsal.pth.tar')
+
         elif(MODEL == 'ventral'):
-            #load_path = 'saved_models/ventral.pth.tar'
             load_path = os.path.join(SAVED_MODELS_DIR, 'ventral.pth.tar')
+
         elif(MODEL == 'default'):
-            #load_path = 'saved_models/'
             load_path = os.path.join(SAVED_MODELS_DIR, 'default.pth.tar')
+
     except:
         print("Error in loading models")
 
@@ -541,6 +575,8 @@ if __name__ == '__main__':
         train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
     if(test_dataset != None):
         test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+    if(val_dataset != None):
+        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
 
 
     integrated_model = integrated_model.IntegratedModel(input_dim=EMBEDDINGS_DIM, output_dim=NUM_CLASSES, encoder=encoder_model,
@@ -548,9 +584,25 @@ if __name__ == '__main__':
                                                         lr_scheduler='reduce_plateau')
 
     trainer = pl.Trainer(gpus=GPUs, 
-                    max_epochs=EPOCHS)
+                        max_epochs=EPOCHS)
 
-    trainer.fit(integrated_model, train_image_loader)
+    if(AUTO_LR_FIND):
+        lr_finder = trainer.tuner.lr_find(integrated_model, train_image_loader)
+        new_lr = lr_finder.suggestion()
+        print("New suggested learning rate is: ", new_lr)
+        integrated_model.hparams.learning_rate = new_lr
+
+
+    if(val_dataset == None):
+
+        print("Validation dataset not provided for {} dataset".format(DATASET))
+        #Providing data loader for only the train set in the fit method.
+        trainer.fit(integrated_model, train_image_loader)
+
+    elif(val_dataset != None):
+
+        #Providing data loader for both the train and val set in the fit method.
+        trainer.fit(integrated_model, train_image_loader, val_image_loader)
 
     if(test_dataset != None):
         trainer.test(dataloaders=test_image_loader)
