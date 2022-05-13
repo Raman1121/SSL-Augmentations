@@ -77,19 +77,34 @@ transform_prob = 1
 crop_height = 224
 crop_width = 224
 
-aug_list = [CLAHE(p=transform_prob), ColorJitter(p=transform_prob), 
-            Downscale(p=transform_prob), Emboss(p=transform_prob), Flip(p=transform_prob),
-            HorizontalFlip(p=transform_prob), VerticalFlip(p=transform_prob), ImageCompression(p=transform_prob), 
-            Rotate(p=transform_prob)]
+aug_dict = {CLAHE(p=transform_prob): 1,
+            ColorJitter(p=transform_prob): 2,
+            Downscale(p=transform_prob): 3,
+            Emboss(p=transform_prob): 4,
+            Flip(p=transform_prob): 5,
+            HorizontalFlip(p=transform_prob): 6,
+            VerticalFlip(p=transform_prob): 7,
+            ImageCompression(p=transform_prob): 8,
+            Rotate(p=transform_prob): 9}
 
-#CenterCrop(crop_height, crop_width, p=transform_prob),
+aug_bit = [0]*len(aug_dict)
 
-print("Number of augmentations: ", len(aug_list))
-randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
+print("Number of augmentations: ", len(aug_dict))
+#randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
+randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
 
-print("{} Augmentations selected: {} \n".format(len(randomly_selected_augs), [i for i in randomly_selected_augs]))
+print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
+print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
 
-#TODO: Add required basic transforms here.
+for aug in randomly_selected_augs:
+    index = aug_dict[aug] - 1
+    aug_bit.insert(index, 1)
+    
+print(aug_bit)
+
+#raise SystemExit(0)
+
+#Add required basic transforms here.
 randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
 
 train_transform = A.Compose(randomly_selected_augs)
