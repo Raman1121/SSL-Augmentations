@@ -34,14 +34,23 @@ class SupervisedModel(LightningModule):
             self.feature_extractor = nn.Sequential(*layers)
             self.classifier = nn.Linear(num_filters, self.num_classes)
 
-    def forward(self, x):
-        self.feature_extractor.eval()
-        with torch.no_grad():
-            representations = self.feature_extractor(x).flatten(1)
+            self.feature_extractor.eval()
 
-        x = self.classifier(representations)
+            for param in self.feature_extractor.parameters():
+                param.requires_grad = False
 
-        return x
+    # def forward(self, x):
+    #     # self.feature_extractor.eval()
+    #     # with torch.no_grad():
+    #     #     representations = self.feature_extractor(x).flatten(1)
+
+    #     # x = self.classifier(representations)
+
+    #     x = self.feature_extractor(x)
+    #     x = x.view(x.size(0), -1)
+    #     x = self.classifier(x)
+
+    #     return x
 
     def training_step(self, batch, batch_idx):
         images, labels = batch
@@ -86,9 +95,29 @@ class SupervisedModel(LightningModule):
 
         return loss
 
+    def validation_step(self, batch, batch_idx):
+        images, labels = batch
+
+        representations = self.feature_extractor(images).flatten(1)
+
+        outputs = self.classifier(representations)
+
+        loss = self.criterion(outputs, labels)
+
+        preds = torch.softmax(outputs, dim=1)
+
+        acc = np.array(np.argmax(preds.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
+
+        #Logging metrics
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+
+        return loss
+
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.learning_rate)
+        #optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         if(self.lr_scheduler == 'none'):
             return optimizer

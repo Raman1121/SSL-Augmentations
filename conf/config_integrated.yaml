@@ -29,8 +29,8 @@ all_datasets:
 
 run:
   batch_size: 128
-  lr_rate: 0.1
-  epochs: 30
+  lr_rate: 0.001
+  epochs: 50
   subset: null
   auto_lr_find: True
 
