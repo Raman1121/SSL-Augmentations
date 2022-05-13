@@ -28,7 +28,7 @@ all_datasets:
 
 
 run:
-  batch_size: 256
+  batch_size: 128
   lr_rate: 0.1
   epochs: 30
   subset: null

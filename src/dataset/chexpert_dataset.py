@@ -1,9 +1,15 @@
+import torch
 from torch.utils.data import Dataset, DataLoader
+import torchvision
 from torchvision import transforms as T
-from torchvision.io import read_image, ImageReadMode
+from torchvision.io import read_image
 import pytorch_lightning as pl
+import albumentations as A
 
+import numpy as np
 import random
+import yaml
+from PIL import Image
 
 class ChexpertDataset(Dataset):
     def __init__(self, df, transforms=None, subset=None):
@@ -54,10 +60,29 @@ class ChexpertDataset(Dataset):
             An image and a label from the dataset based on the given index idx.
         """
 
-        image = read_image(self.df['Path'][idx], mode=ImageReadMode.RGB)
         label = self.df['Pathology'][idx]
 
         if(self.transforms):
-            image = self.transforms(image)
+
+            #Check if torchvision transforms are provided
+            if(type(self.transforms) == torchvision.transforms.transforms.Compose):
+                image = read_image(self.df['Path'][idx], mode=ImageReadMode.RGB)
+                image = self.transforms(image)
+
+            #Check if albumentation transforms are provided
+            elif(type(self.transforms) == A.core.composition.Compose):
+                pillow_image = Image.open(self.df['Path'][idx])
+                pillow_image = pillow_image.convert('RGB')
+                image = np.array(pillow_image)
+
+                #image = image.cpu().detach().numpy()            #Albumentation takes image as a numpy array.
+                image = self.transforms(image=image)['image']
+
+                image = torch.from_numpy(image)
+                image = image.permute(2, 0, 1)
+
+                #image = image.type(torch.FloatTensor)
+                image = image.float()
+                #print(image.dtype)
 
         return image, label
