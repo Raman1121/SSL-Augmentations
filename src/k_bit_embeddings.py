@@ -64,6 +64,11 @@ NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
 #SAVING CONSTANTS
 SAVED_MODELS_DIR = '../Saved_models'
 
+pprint(yaml_data)
+print("Dataset: ", DATASET)
+print("SUBSET: ", SUBSET)
+print("Saved Models dir: ", SAVED_MODELS_DIR)
+
 if(EXPERIMENTAL_RUN):
     EPOCHS = 1
     AUTO_LR_FIND = False
