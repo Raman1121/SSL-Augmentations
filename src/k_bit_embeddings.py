@@ -17,12 +17,12 @@ from albumentations.augmentations.crops.transforms import *
 from albumentations.augmentations.geometric.rotate import *
 from albumentations.augmentations.geometric.resize import Resize
 
-
 from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
 from model import supervised_model
 
 import argparse
 import yaml
+from pprint import pprint
 
 ##############################################################################################
 
