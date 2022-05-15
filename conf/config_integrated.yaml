@@ -31,8 +31,10 @@ run:
   batch_size: 128
   lr_rate: 0.001
   epochs: 50
-  subset: null
+  subset: 1000
   auto_lr_find: True
+  save_plots: True
+  experiment: 'k_bit_embeddings'
 
   
 

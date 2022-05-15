@@ -6,5 +6,6 @@ Embeddings/
 Saved_models/
 src/lightning_logs/
 src/slurm*
+src/saved_plots/
 output_files/
 *.ckpt

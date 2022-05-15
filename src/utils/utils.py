@@ -12,6 +12,7 @@ import os
 import pandas as pd
 import numpy as np
 import yaml
+import matplotlib.pyplot as plt
 
 def check_data_loader(dl):
 
@@ -77,6 +78,29 @@ def load_chexpert_dataset(yaml_data, train_transforms, test_transforms):
     valid_df['Path'] = valid_df['Path'].apply(lambda x: str(ROOT_PATH+x))
 
     pass
+
+def plot_run_stats(num_runs, all_acc, all_loss, dataset, save_dir='saved_plots/', save_plot=True):
+    if(save_plot):
+        runs = list(range(num_runs))
+        plt.plot(runs, all_acc, label='Test Accuracy', linewidth=4)
+        plt.plot(runs, all_loss, label='Test Loss', linewidth=4)
+
+        plt.xticks(np.arange(num_runs), runs)
+        plt.xlabel('Runs')
+        plt.ylabel('Metrics')
+
+        plt.title("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
+        plt.legend()
+        plt.show()
+
+        #save_path = os.path.join(save_dir, dataset+'.png')
+
+        plt.savefig(save_dir+dataset+'.png')
+            
+        
+    else:
+        print("Saving plot skipped.")
+
 
 def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
 

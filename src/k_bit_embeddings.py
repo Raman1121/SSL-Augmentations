@@ -3,6 +3,8 @@ import random
 import numpy as np
 import pandas as pd
 
+from utils import utils
+
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
@@ -29,6 +31,7 @@ from pprint import pprint
 parser = argparse.ArgumentParser(description='Hyper-parameters management')
 parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
+parser.add_argument('--num_runs', type=int, default=1, help='Number of runs for a dataset. Different augmentations will be randomly samples in each run.')
 
 args = parser.parse_args()
 
@@ -52,6 +55,9 @@ EXPERIMENTAL_RUN = args.experimental_run
 EMBEDDINGS_DIM = 2048
 SUBSET = yaml_data['run']['subset']
 AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
+NUM_RUNS = args.num_runs
+SAVE_PLOTS = yaml_data['run']['save_plots']
+EXPERIMENT = yaml_data['run']['experiment']
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -67,6 +73,7 @@ SAVED_MODELS_DIR = '../Saved_models'
 pprint(yaml_data)
 print("Dataset: ", DATASET)
 print("SUBSET: ", SUBSET)
+print("Number of Runs: ", NUM_RUNS)
 print("Saved Models dir: ", SAVED_MODELS_DIR)
 
 if(EXPERIMENTAL_RUN):
@@ -92,168 +99,204 @@ aug_dict = {CLAHE(p=transform_prob): 1,
             ImageCompression(p=transform_prob): 8,
             Rotate(p=transform_prob): 9}
 
-aug_bit = [0]*len(aug_dict)
 
-print("Number of augmentations: ", len(aug_dict))
-#randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
-randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
+all_acc = []
+all_loss = []
 
-print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
-print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
+for _run in range(NUM_RUNS):
 
-for aug in randomly_selected_augs:
-    index = aug_dict[aug] - 1
-    aug_bit.insert(index, 1)
-    
-print(aug_bit)
+    #Load the train set
+    main_df = pd.read_csv(TRAIN_DF_PATH)
 
-#raise SystemExit(0)
+    run_acc = 0         #Initialize new accuracy for each run
+    run_loss = 0        #Initialize new loss for each run
 
-#Add required basic transforms here.
-randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
+    aug_bit = [0]*len(aug_dict)
 
-train_transform = A.Compose(randomly_selected_augs)
+    print("Number of augmentations: ", len(aug_dict))
+    #randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
+    randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
+
+    print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
+    print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
+
+    for aug in randomly_selected_augs:
+        index = aug_dict[aug] - 1
+        aug_bit.insert(index, 1)
+        
+    print(aug_bit)
+
+    #raise SystemExit(0)
+
+    #Add required basic transforms here.
+    randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
+
+    train_transform = A.Compose(randomly_selected_augs)
+
+    ##################################### DATASETS #######################################
+
+    train_dataset = None
+    test_dataset = None
+    val_dataset = None
+
+    if(DATASET == 'retinopathy'):
+
+        '''
+        Preparing the Diabetic Retinopathy dataset
+        '''
+        
+        #Load the test set for DR dataset
+        TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
+        test_df = pd.read_csv(TEST_DF_PATH)
+
+        TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
+        VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
+        TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
+
+        main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
+        test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
+
+        train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+
+        test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
+                                                            transforms=train_transform, subset=SUBSET)
+
+    elif(DATASET == 'cancer_mnist'):
+
+        '''
+        Preparing the Cancer MNIST dataset
+        '''
+
+        #NOTE: Test data for this dataset has not been provided!
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+    elif(DATASET == 'chexpert'):
+        '''
+        Preparing the CheXpert dataset
+        '''
+        #NOTE: Test data for this dataset has not been provided!
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        
+        train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
+                                                        subset=SUBSET)
+
+        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
+                                                        subset=SUBSET)
+
+        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
+                                                        subset=SUBSET)
+
+    elif(DATASET == 'mura'):
+        '''
+        Preparing the MURA dataset
+        '''
+
+        #NOTE: Test data for this dataset has not been provided!
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
+                                                                subset=SUBSET)
+
+        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
+                                                                subset=SUBSET)
+
+    ######################################################################################
 
 
-#Load the train set
-main_df = pd.read_csv(TRAIN_DF_PATH)
+    #Creating Data Loaders
+    if(train_dataset != None):
+        train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+    if(test_dataset != None):
+        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
+    if(val_dataset != None):
+        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
-##################################### DATASETS #######################################
-
-train_dataset = None
-test_dataset = None
-val_dataset = None
-
-if(DATASET == 'retinopathy'):
-
-    '''
-    Preparing the Diabetic Retinopathy dataset
-    '''
-    
-    #Load the test set for DR dataset
-    TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
-    test_df = pd.read_csv(TEST_DF_PATH)
-
-    TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
-    VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
-    TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
-
-    main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
-    test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
-
-    train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                        transforms=train_transform, subset=SUBSET)
-
-    test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                        transforms=train_transform, subset=SUBSET)
-
-elif(DATASET == 'cancer_mnist'):
-
-    '''
-    Preparing the Cancer MNIST dataset
-    '''
-
-    #NOTE: Test data for this dataset has not been provided!
-
-    # Creating training and test splits
-    train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                random_state=SEED)
-    train_df = train_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
-
-    train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
-                                                            subset=SUBSET)
-
-    test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
-                                                            subset=SUBSET)
-
-elif(DATASET == 'chexpert'):
-    '''
-    Preparing the CheXpert dataset
-    '''
-    #NOTE: Test data for this dataset has not been provided!
-
-    VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-    val_df = pd.read_csv(VAL_DF_PATH)
-
-    # Creating training and test splits
-    train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                random_state=SEED)
-
-    train_df = train_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
-
-    
-    train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
-                                                    subset=SUBSET)
-
-    val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
-                                                    subset=SUBSET)
-
-    test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
-                                                    subset=SUBSET)
-
-elif(DATASET == 'mura'):
-    '''
-    Preparing the MURA dataset
-    '''
-
-    #NOTE: Test data for this dataset has not been provided!
-
-    VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-    val_df = pd.read_csv(VAL_DF_PATH)
-
-    # Creating training and test splits
-    train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                random_state=SEED)
-
-    train_df = train_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
-
-    train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
-                                                            subset=SUBSET)
-
-    val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
-                                                            subset=SUBSET)
-
-    test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
-                                                            subset=SUBSET)
-
-######################################################################################
-
-
-#Creating Data Loaders
-if(train_dataset != None):
-    train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
-if(test_dataset != None):
-    test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-if(val_dataset != None):
-    val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-
-supervised_model = supervised_model.SupervisedModel(encoder='resnet50_supervised', batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+    model = supervised_model.SupervisedModel(encoder='resnet50_supervised', batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                                     lr_rate=lr_rate, lr_scheduler='none')
 
-trainer = pl.Trainer(gpus=GPUs, 
-                    max_epochs=EPOCHS)
+    trainer = pl.Trainer(gpus=GPUs, 
+                        max_epochs=EPOCHS)
 
-if(AUTO_LR_FIND):
-    lr_finder = trainer.tuner.lr_find(supervised_model, train_image_loader)
-    new_lr = lr_finder.suggestion()
-    print("New suggested learning rate is: ", new_lr)
-    supervised_model.hparams.learning_rate = new_lr
+    if(AUTO_LR_FIND):
+        lr_finder = trainer.tuner.lr_find(model, train_image_loader)
+        new_lr = lr_finder.suggestion()
+        print("New suggested learning rate is: ", new_lr)
+        model.hparams.learning_rate = new_lr
 
-if(val_dataset == None):
+    if(val_dataset == None):
 
-    print("Validation dataset not provided for {} dataset".format(DATASET))
-    #Providing data loader for only the train set in the fit method.
-    trainer.fit(supervised_model, train_image_loader)
+        print("Validation dataset not provided for {} dataset".format(DATASET))
+        #Providing data loader for only the train set in the fit method.
+        trainer.fit(model, train_image_loader)
 
-elif(val_dataset != None):
+    elif(val_dataset != None):
 
-    #Providing data loader for both the train and val set in the fit method.
-    trainer.fit(supervised_model, train_image_loader, val_image_loader)
+        #Providing data loader for both the train and val set in the fit method.
+        trainer.fit(model, train_image_loader, val_image_loader)
 
-if(test_dataset != None):
-    trainer.test(dataloaders=test_image_loader)
-else:
-    print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
+    if(test_dataset != None):
+        test_results = trainer.test(dataloaders=test_image_loader)
+        
+        run_acc = test_results[0]['test_acc']
+        run_loss = test_results[0]['test_loss']
+
+        all_acc.append(run_acc)
+        all_loss.append(run_loss)
+        #print(test_results)
+
+        print("Test Accuracy for run {} is: {}".format(_run+1, run_acc))
+        print("Test Loss for run {} is: {}".format(_run+1, run_loss))
+        print("#######################################################")
+        print('\n')
+
+    else:
+        print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
+
+if(NUM_RUNS > 1):
+    mean_test_acc = sum(all_acc)/len(all_acc)
+    mean_test_loss = sum(all_loss)/len(all_loss)
+    print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_acc])
+    print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_loss])
+    print("\n")
+
+    print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
+    print("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+
+    utils.plot_run_stats(NUM_RUNS, all_acc, all_loss, DATASET, 
+                        save_dir='saved_plots/', 
+                        save_plot=SAVE_PLOTS)
+    
