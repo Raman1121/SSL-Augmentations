@@ -202,7 +202,7 @@ class SupervisedModel(LightningModule):
         if(self.lr_scheduler == 'none'):
             return optimizer
         elif(self.lr_scheduler == 'reduce_plateau'):
-            scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, min_lr=1e-6, patience=6, verbose=True)
+            scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, min_lr=1e-6, patience=6, verbose=True)
 
         return {"optimizer": optimizer, 
                 "lr_scheduler":{

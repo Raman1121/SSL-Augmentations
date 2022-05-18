@@ -189,8 +189,9 @@ for _run in range(NUM_RUNS):
         test_df = test_df.reset_index(drop=True)
 
         #Checking if SUBSET size is greater than the size of the dataset itself.
-        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
 
         train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
@@ -219,9 +220,10 @@ for _run in range(NUM_RUNS):
         test_df = test_df.reset_index(drop=True)
         
         #Checking if SUBSET size is greater than the size of the dataset itself.
-        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
-        VAL_SUBSET = len(val_df) if len(val_df) < SUBSET else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
     
         train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
                                                         subset=TRAIN_SUBSET)
@@ -255,9 +257,10 @@ for _run in range(NUM_RUNS):
         test_df = test_df.reset_index(drop=True)
 
         #Checking if SUBSET size is greater than the size of the dataset itself.
-        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
-        VAL_SUBSET = len(val_df) if len(val_df) < SUBSET else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
 
         train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
@@ -290,7 +293,7 @@ for _run in range(NUM_RUNS):
 
     
     model = supervised_model.SupervisedModel(encoder='resnet50_supervised', batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
-                                                    lr_rate=lr_rate, lr_scheduler='none', 
+                                                    lr_rate=lr_rate, lr_scheduler='reduce_plateau', 
                                                     do_finetune=DO_FINETUNE, 
                                                     activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 
