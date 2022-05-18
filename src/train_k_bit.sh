@@ -4,6 +4,6 @@
 #SBATCH --partition ampere
 #SBATCH --gres=gpu:1
 #SBATCH --account BMAI-CDT-SL2-GPU
-#SBATCH --time=7:00:00
+#SBATCH --time=20:00:00
 
-python k_bit_embeddings.py --dataset mura
+python k_bit_embeddings.py --dataset chexpert

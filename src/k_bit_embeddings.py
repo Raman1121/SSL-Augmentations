@@ -1,4 +1,5 @@
 import os
+import logging
 import random
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as T
 
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import CSVLogger
 
 from sklearn.model_selection import train_test_split
 
@@ -35,7 +37,6 @@ parser.add_argument('--num_runs', type=int, default=1, help='Number of runs for 
 
 args = parser.parse_args()
 
-
 with open('../conf/config_integrated.yaml') as file:
         yaml_data = yaml.safe_load(file)
 
@@ -45,6 +46,7 @@ if(device == torch.device(type='cpu')):
     GPUs = 0
 elif(device == torch.device(type='cuda')):
     GPUs = 1
+    #GPUs = torch.cuda.device_count()
 
 #RUN CONSTANTS
 BATCH_SIZE = yaml_data['run']['batch_size']
@@ -58,6 +60,7 @@ AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
 NUM_RUNS = args.num_runs
 SAVE_PLOTS = yaml_data['run']['save_plots']
 EXPERIMENT = yaml_data['run']['experiment']
+DO_FINETUNE = yaml_data['run']['do_finetune']
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -80,7 +83,8 @@ if(EXPERIMENTAL_RUN):
     EPOCHS = 1
     AUTO_LR_FIND = False
 
-
+# logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
+# logging.info("YAML DATA: f'{yaml_data}")
 
 transform_prob = 1
 #crop_height = int(0.7*224) #Assuming all images would be 224x224
@@ -156,11 +160,19 @@ for _run in range(NUM_RUNS):
         main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
         test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
 
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+        TRAIN_SUBSET = len(main_df) if len(main_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+
         train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
+                                                            transforms=train_transform, subset=TRAIN_SUBSET)
 
         test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
+                                                            transforms=train_transform, subset=TEST_SUBSET)
+                                                        
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
 
     elif(DATASET == 'cancer_mnist'):
 
@@ -168,7 +180,7 @@ for _run in range(NUM_RUNS):
         Preparing the Cancer MNIST dataset
         '''
 
-        #NOTE: Test data for this dataset has not been provided!
+        #NOTE: Val and Test data for this dataset has not been provided!
 
         # Creating training and test splits
         train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
@@ -176,11 +188,19 @@ for _run in range(NUM_RUNS):
         train_df = train_df.reset_index(drop=True)
         test_df = test_df.reset_index(drop=True)
 
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+
         train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
-                                                                subset=SUBSET)
+                                                                subset=TRAIN_SUBSET)
 
         test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
-                                                                subset=SUBSET)
+                                                                subset=TEST_SUBSET)
+
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
 
     elif(DATASET == 'chexpert'):
         '''
@@ -197,16 +217,25 @@ for _run in range(NUM_RUNS):
 
         train_df = train_df.reset_index(drop=True)
         test_df = test_df.reset_index(drop=True)
-
         
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < SUBSET else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+    
         train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
-                                                        subset=SUBSET)
+                                                        subset=TRAIN_SUBSET)
 
         val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
-                                                        subset=SUBSET)
+                                                        subset=VAL_SUBSET)
 
         test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
-                                                        subset=SUBSET)
+                                                        subset=TEST_SUBSET)
+                                                
+
+        ACTIVATION = 'sigmoid'
+        LOSS_FN = 'bce'
+        MULTILABLE = True
 
     elif(DATASET == 'mura'):
         '''
@@ -225,31 +254,49 @@ for _run in range(NUM_RUNS):
         train_df = train_df.reset_index(drop=True)
         test_df = test_df.reset_index(drop=True)
 
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+        TRAIN_SUBSET = len(train_df) if len(train_df) < SUBSET else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < SUBSET else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < SUBSET else SUBSET
+
         train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
-                                                                subset=SUBSET)
+                                                                subset=TRAIN_SUBSET)
 
         val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
-                                                                subset=SUBSET)
+                                                                subset=VAL_SUBSET)
 
         test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
-                                                                subset=SUBSET)
+                                                                subset=TEST_SUBSET)
+
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
 
     ######################################################################################
 
 
     #Creating Data Loaders
     if(train_dataset != None):
+        print("Train dataset length: ", len(train_dataset))
         train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
-    if(test_dataset != None):
-        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
+
     if(val_dataset != None):
+        print("Val dataset length: ", len(val_dataset))
         val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
+    if(test_dataset != None):
+        print("Test dataset length: ", len(test_dataset))
+        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
+
+    
     model = supervised_model.SupervisedModel(encoder='resnet50_supervised', batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
-                                                    lr_rate=lr_rate, lr_scheduler='none')
+                                                    lr_rate=lr_rate, lr_scheduler='none', 
+                                                    do_finetune=DO_FINETUNE, 
+                                                    activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 
     trainer = pl.Trainer(gpus=GPUs, 
-                        max_epochs=EPOCHS)
+                        max_epochs=EPOCHS,
+                        )
 
     if(AUTO_LR_FIND):
         lr_finder = trainer.tuner.lr_find(model, train_image_loader)
@@ -296,7 +343,7 @@ if(NUM_RUNS > 1):
     print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
     print("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
 
-    utils.plot_run_stats(NUM_RUNS, all_acc, all_loss, DATASET, 
+    utils.plot_run_stats(NUM_RUNS, all_acc, all_loss, DATASET,
+                        aug_bit = aug_bit, 
                         save_dir='saved_plots/', 
                         save_plot=SAVE_PLOTS)
-    

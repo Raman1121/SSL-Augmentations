@@ -26,6 +26,8 @@ class ChexpertDataset(Dataset):
         self.df = df
         self.transforms = transforms
         self.subset = subset
+        self.image_paths = []
+        self.image_labels = []
 
         if(self.subset != None):
             print("Creating a subset of {} samples".format(self.subset))
@@ -37,6 +39,23 @@ class ChexpertDataset(Dataset):
             print("Creating the entire dataset.")
 
 
+        #Preparing labels list
+        for index, row in self.df.iterrows():
+            img_path = row.Path
+            self.image_paths.append(img_path)
+
+            if(len(row) < 14):
+                labels = [0]*14
+            else:
+                labels = []
+                for col in row[5:]:
+                    if(col == 1):
+                        labels.append(1)
+                    else:
+                        labels.append(0)
+
+            self.image_labels.append(labels)
+
     def __len__(self):
 
         """
@@ -46,7 +65,7 @@ class ChexpertDataset(Dataset):
             Number of samples in our dataset.
         """
 
-        return len(self.df)
+        return len(self.image_paths)
 
     def __getitem__(self, idx):
 
@@ -60,18 +79,18 @@ class ChexpertDataset(Dataset):
             An image and a label from the dataset based on the given index idx.
         """
 
-        label = self.df['Pathology'][idx]
+        image_path = self.image_paths[idx]
 
         if(self.transforms):
 
             #Check if torchvision transforms are provided
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
-                image = read_image(self.df['Path'][idx], mode=ImageReadMode.RGB)
+                image = read_image(image_path, mode=ImageReadMode.RGB)
                 image = self.transforms(image)
 
             #Check if albumentation transforms are provided
             elif(type(self.transforms) == A.core.composition.Compose):
-                pillow_image = Image.open(self.df['Path'][idx])
+                pillow_image = Image.open(image_path)
                 pillow_image = pillow_image.convert('RGB')
                 image = np.array(pillow_image)
 
@@ -85,4 +104,4 @@ class ChexpertDataset(Dataset):
                 image = image.float()
                 #print(image.dtype)
 
-        return image, label
+        return image, torch.FloatTensor(self.image_labels[idx])

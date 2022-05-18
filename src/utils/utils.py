@@ -79,23 +79,30 @@ def load_chexpert_dataset(yaml_data, train_transforms, test_transforms):
 
     pass
 
-def plot_run_stats(num_runs, all_acc, all_loss, dataset, save_dir='saved_plots/', save_plot=True):
+def plot_run_stats(num_runs, all_acc, all_loss, dataset, aug_bit, save_dir='saved_plots/', save_plot=True):
     if(save_plot):
         runs = list(range(num_runs))
+
         plt.plot(runs, all_acc, label='Test Accuracy', linewidth=4)
         plt.plot(runs, all_loss, label='Test Loss', linewidth=4)
+        plt.plot(runs, [np.mean(all_acc)]*len(all_acc), label='Mean Acc', linewidth=2, linestyle='dashed')
 
         plt.xticks(np.arange(num_runs), runs)
         plt.xlabel('Runs')
-        plt.ylabel('Metrics')
+        plt.ylabel('Value')
 
-        plt.title("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
+        #plt.title("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
+        title = ' '.join(str(i) for i in aug_bit)
+        title = '['+title+']'
+        prefix = 'Test Acc and Loss for bit representation: '
+        plt.title(prefix+title)
+
         plt.legend()
         plt.show()
 
         #save_path = os.path.join(save_dir, dataset+'.png')
 
-        plt.savefig(save_dir+dataset+'.png')
+        plt.savefig(save_dir+dataset+'_'+str(num_runs)+'.png')
             
         
     else:

@@ -10,7 +10,7 @@ all_datasets:
     val_cat_labels: ['Good', 'Usable', 'Reject']
 
   chexpert:
-    num_classes: 2
+    num_classes: 14
     root_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/'
     train_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/train_final.csv'
     val_df_path: '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/valid_final.csv'
@@ -30,11 +30,12 @@ all_datasets:
 run:
   batch_size: 128
   lr_rate: 0.001
-  epochs: 50
-  subset: 1000
+  epochs: 30
+  subset: null
   auto_lr_find: True
   save_plots: True
   experiment: 'k_bit_embeddings'
+  do_finetune: True
 
   
 
