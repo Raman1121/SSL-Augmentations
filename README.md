@@ -1,2 +1,2 @@
 # SSL-Augmentations
-A project to investigate optimal augmentations for Self-Supervised Learning in Medical Imaging Tasks
+A project to investigate optimal invariances for Self-Supervised Learning in Medical Imaging Tasks
