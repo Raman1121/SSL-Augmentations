@@ -140,6 +140,7 @@ for _run in range(NUM_RUNS):
 
     run_acc = 0         #Initialize new accuracy for each run
     run_loss = 0        #Initialize new loss for each run
+    run_f1 = 0          #Initialize new F1 score for each run
 
     aug_bit = [0]*len(aug_dict)
 
@@ -152,7 +153,7 @@ for _run in range(NUM_RUNS):
 
     for aug in randomly_selected_augs:
         index = aug_dict[aug] - 1
-        aug_bit.insert(index, 1)
+        aug_bit[index] = 1
         
     print(aug_bit)
     all_aug_bits.append(aug_bit)
