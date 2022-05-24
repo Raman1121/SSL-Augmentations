@@ -28,14 +28,16 @@ all_datasets:
 
 
 run:
-  batch_size: 128
-  lr_rate: 0.001
-  epochs: 20
+  batch_size: 256
+  lr_rate: 0.005
+  epochs: 1
   subset: null
-  auto_lr_find: True
-  save_plots: True
+  auto_lr_find: False
+  save_plots: False
   experiment: 'k_bit_embeddings'
   do_finetune: True
+  lr_scheduler: 'cyclic'
+  encoder: 'simclr'
 
   
 

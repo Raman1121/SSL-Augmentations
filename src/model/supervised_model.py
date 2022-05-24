@@ -40,24 +40,34 @@ class SupervisedModel(LightningModule):
             self.criterion = nn.BCELoss()
         
 
-        if(self.encoder == 'resnet50_supervised'):
+        if(self.encoder == 'resnet50'):
             backbone = models.resnet50(pretrained=True)
             num_filters = backbone.fc.in_features
             layers = list(backbone.children())[:-1]
             self.feature_extractor = nn.Sequential(*layers)
             self.classifier = nn.Linear(num_filters, self.num_classes)
+            
 
-            # if(activation == 'softmax'):
-            #     self.classifier = nn.Sequential(nn.Linear(num_filters, self.num_classes), nn.Softmax())
-            # elif(activation == 'sigmoid'):
-            #     self.classifier = nn.Sequential(nn.Linear(num_filters, self.num_classes), nn.Sigmoid())
+        elif(self.encoder == 'vit_patch16'):
+            self.feature_extractor = timm.create_model('vit_base_patch16_224_in21k', pretrained=True, num_classes=0)
+            config = resolve_data_config({}, model=self.feature_extractor)
+            transform = create_transform(**config)
+            self.classifier = nn.Linear(768, self.num_classes)
 
-            if(do_finetune):
+        elif(self.encoder == 'simclr'):
+            weight_path = 'https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt'
+            simclr = SimCLR.load_from_checkpoint(weight_path, strict=False)
+            self.feature_extractor = simclr.encoder
+            self.classifier = nn.Linear(2048, self.num_classes)
+        
 
-                self.feature_extractor.eval()
-                
-                for param in self.feature_extractor.parameters():
-                    param.requires_grad = False
+        #Check for finetuning
+        if(do_finetune):
+
+            self.feature_extractor.eval()
+            
+            for param in self.feature_extractor.parameters():
+                param.requires_grad = False
 
     # def forward(self, x):
     #     # self.feature_extractor.eval()
@@ -69,6 +79,8 @@ class SupervisedModel(LightningModule):
     #     x = self.feature_extractor(x)
     #     x = x.view(x.size(0), -1)
     #     x = self.classifier(x)
+
+    #     print("In forward method!")
 
     #     return x
 
@@ -93,6 +105,9 @@ class SupervisedModel(LightningModule):
             acc = (probs == true_labels).sum()/(N*C)
 
         else:
+            _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
+            print(_arr, _counts/_counts.sum()*100)
+            #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
             acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
             
         return acc
@@ -103,7 +118,14 @@ class SupervisedModel(LightningModule):
         
         images, labels = batch
 
-        representations = self.feature_extractor(images).flatten(1)
+        if(self.encoder == 'resnet50'):
+            representations = self.feature_extractor(images).flatten(1)
+        elif(self.encoder == 'vit_patch16'):
+            representations = self.feature_extractor(images)
+        elif(self.encoder == 'simclr'):
+            representations = self.feature_extractor(images)[0]
+
+        #print("Representations: ", representations.shape)
 
         logits = self.classifier(representations)  #LOGITS (Unnormalized)
 
@@ -140,7 +162,12 @@ class SupervisedModel(LightningModule):
         
         images, labels = batch
 
-        representations = self.feature_extractor(images).flatten(1)
+        if(self.encoder == 'resnet50'):
+            representations = self.feature_extractor(images).flatten(1)
+        elif(self.encoder == 'vit_patch16'):
+            representations = self.feature_extractor(images)
+        elif(self.encoder == 'simclr'):
+            representations = self.feature_extractor(images)[0]
 
         logits = self.classifier(representations)  #LOGITS (Unnormalized)
 
@@ -161,7 +188,7 @@ class SupervisedModel(LightningModule):
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return loss
+        return {'acc':acc, 'loss':loss}
         
 
 
@@ -169,7 +196,12 @@ class SupervisedModel(LightningModule):
         
         images, labels = batch
 
-        representations = self.feature_extractor(images).flatten(1)
+        if(self.encoder == 'resnet50'):
+            representations = self.feature_extractor(images).flatten(1)
+        elif(self.encoder == 'vit_patch16'):
+            representations = self.feature_extractor(images)
+        elif(self.encoder == 'simclr'):
+            representations = self.feature_extractor(images)[0]
 
         logits = self.classifier(representations)  #LOGITS (Unnormalized)
 
@@ -190,19 +222,20 @@ class SupervisedModel(LightningModule):
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return loss
-        
-
-    
+        return {'acc':acc, 'loss':loss}
         
     def configure_optimizers(self):
         #optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.learning_rate)
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=0.0008)
 
         if(self.lr_scheduler == 'none'):
             return optimizer
         elif(self.lr_scheduler == 'reduce_plateau'):
             scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, min_lr=1e-6, patience=6, verbose=True)
+        elif(self.lr_scheduler == 'cyclic'):
+            scheduler = CyclicLR(optimizer, base_lr=self.learning_rate, max_lr=1e-1, cycle_momentum=False, verbose=True)
+        elif(self.lr_scheduler == 'cosine'):
+            scheduler = CosineAnnealingLR(optimizer, T_max=1000, verbose=True)
 
         return {"optimizer": optimizer, 
                 "lr_scheduler":{

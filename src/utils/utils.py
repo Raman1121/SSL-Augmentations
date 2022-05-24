@@ -79,8 +79,15 @@ def load_chexpert_dataset(yaml_data, train_transforms, test_transforms):
 
     pass
 
-def plot_run_stats(num_runs, all_acc, all_loss, dataset, aug_bit, save_dir='saved_plots/', save_plot=True):
+def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_plot=True):
     if(save_plot):
+
+        num_runs = info_dict['num_runs']
+        dataset = info_dict['dataset']
+        encoder = info_dict['encoder']
+        finetune = info_dict['finetune']
+        experiment = info_dict['experiment']
+
         runs = list(range(num_runs))
 
         plt.plot(runs, all_acc, label='Test Accuracy', linewidth=4)
@@ -91,22 +98,42 @@ def plot_run_stats(num_runs, all_acc, all_loss, dataset, aug_bit, save_dir='save
         plt.xlabel('Runs')
         plt.ylabel('Value')
 
-        #plt.title("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
-        title = ' '.join(str(i) for i in aug_bit)
-        title = '['+title+']'
-        prefix = 'Test Acc and Loss for bit representation: '
-        plt.title(prefix+title)
+        plt.suptitle("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
+        plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
+        #title = ' '.join(str(i) for i in aug_bit)
+        #title = '['+title+']'
+        #prefix = 'Test Acc and Loss'
+        #plt.title(prefix)
 
         plt.legend()
         plt.show()
 
         #save_path = os.path.join(save_dir, dataset+'.png')
 
-        plt.savefig(save_dir+dataset+'_'+str(num_runs)+'.png')
+        plt.savefig(save_dir+dataset+'_'+str(num_runs)+'_'+encoder+'.png')
             
         
     else:
         print("Saving plot skipped.")
+
+
+def sort_dictionary(results_dict):
+    
+    all_acc = results_dict['acc']
+    all_loss = results_dict['loss']
+    all_repr = results_dict['k_bit_representation']
+    all_runs = results_dict['run']
+
+    l1, l2, l3, l4 = (list(t) for t in zip(*sorted(zip(all_acc, all_loss, all_repr, all_runs), reverse=True)))
+
+    sorted_dict = {}
+    sorted_dict['acc'] = l1
+    sorted_dict['loss'] = l2
+    sorted_dict['k_bit_representation'] = l3
+    sorted_dict['run'] = l4
+
+    return sorted_dict
+
 
 
 def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):

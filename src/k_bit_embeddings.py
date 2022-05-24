@@ -3,6 +3,7 @@ import logging
 import random
 import numpy as np
 import pandas as pd
+from datetime import date
 
 from utils import utils
 
@@ -61,6 +62,8 @@ NUM_RUNS = args.num_runs
 SAVE_PLOTS = yaml_data['run']['save_plots']
 EXPERIMENT = yaml_data['run']['experiment']
 DO_FINETUNE = yaml_data['run']['do_finetune']
+ENCODER = yaml_data['run']['encoder']
+LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -106,8 +109,29 @@ aug_dict = {CLAHE(p=transform_prob): 1,
 
 all_acc = []
 all_loss = []
+all_aug_bits = []
+all_runs = []
+
+# A dictionary to store the best results and corresponding bit representation from all runs
+all_results = {
+                'acc': [],
+                'loss': [],
+                'k_bit_representation': [0]*len(aug_dict),
+                'run': []
+                }
+
+#Save results to a text file
+filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
+f = open(filename, "a")
+f.write("EXPERIMENT DATE: {}".format(date.today()))
+f.write("\n")
+
 
 for _run in range(NUM_RUNS):
+
+    print(" ################## Starting Run {} ################## ".format(_run+1))
+    f.write
+    all_runs.append(_run+1)
 
     #Load the train set
     main_df = pd.read_csv(TRAIN_DF_PATH)
@@ -129,6 +153,7 @@ for _run in range(NUM_RUNS):
         aug_bit.insert(index, 1)
         
     print(aug_bit)
+    all_aug_bits.append(aug_bit)
 
     #raise SystemExit(0)
 
@@ -136,6 +161,7 @@ for _run in range(NUM_RUNS):
     randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
 
     train_transform = A.Compose(randomly_selected_augs)
+    basic_transform = A.Compose([Resize(224, 224)])
 
     ##################################### DATASETS #######################################
 
@@ -168,7 +194,7 @@ for _run in range(NUM_RUNS):
                                                             transforms=train_transform, subset=TRAIN_SUBSET)
 
         test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=train_transform, subset=TEST_SUBSET)
+                                                            transforms=basic_transform, subset=TEST_SUBSET)
                                                         
         ACTIVATION = 'softmax'
         LOSS_FN = 'cross_entropy'
@@ -196,7 +222,7 @@ for _run in range(NUM_RUNS):
         train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
 
-        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
+        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=basic_transform, 
                                                                 subset=TEST_SUBSET)
 
         ACTIVATION = 'softmax'
@@ -231,7 +257,7 @@ for _run in range(NUM_RUNS):
         val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
                                                         subset=VAL_SUBSET)
 
-        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
+        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
                                                         subset=TEST_SUBSET)
                                                 
 
@@ -268,7 +294,7 @@ for _run in range(NUM_RUNS):
         val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
                                                                 subset=VAL_SUBSET)
 
-        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
+        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 
                                                                 subset=TEST_SUBSET)
 
         ACTIVATION = 'softmax'
@@ -292,10 +318,10 @@ for _run in range(NUM_RUNS):
         test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
     
-    model = supervised_model.SupervisedModel(encoder='resnet50_supervised', batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
-                                                    lr_rate=lr_rate, lr_scheduler='reduce_plateau', 
-                                                    do_finetune=DO_FINETUNE, 
-                                                    activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
+    model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+                                            lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
+                                            do_finetune=DO_FINETUNE, 
+                                            activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 
     trainer = pl.Trainer(gpus=GPUs, 
                         max_epochs=EPOCHS,
@@ -324,14 +350,46 @@ for _run in range(NUM_RUNS):
         run_acc = test_results[0]['test_acc']
         run_loss = test_results[0]['test_loss']
 
+        # try:
+
+        #     if(run_acc > best_results['best_acc'][0]):
+        #         best_results['run'] = [_run+1]
+        #         best_results['best_acc'] = [run_acc]
+        #         best_results['k_bit_representation'] = [aug_bit]
+
+        #     elif(run_acc == best_results['best_acc']):
+        #         _best_runs = best_results['run']
+        #         _best_runs.append(_run)
+
+        #         _best_acc = best_results['best_acc']
+        #         _best_acc.append(run_acc)
+
+        #         _best_k_bits = best_results['k_bit_representation']
+        #         _best_k_bits.append(aug_bit)
+
+        #         best_results['run'] = _best_runs
+        #         best_results['best_acc'] = _best_acc
+        #         best_results['k_bit_representation'] = _best_k_bits
+        
+        # except:
+        #     print("Error while obtaining best results from all runs.")
+
         all_acc.append(run_acc)
         all_loss.append(run_loss)
         #print(test_results)
+
+        #Saving results from all the runs
+        all_results['acc'] = all_acc
+        all_results['loss'] = all_loss
+        all_results['k_bit_representation'] = all_aug_bits
+        all_results['run'] = all_runs
 
         print("Test Accuracy for run {} is: {}".format(_run+1, run_acc))
         print("Test Loss for run {} is: {}".format(_run+1, run_loss))
         print("#######################################################")
         print('\n')
+
+
 
     else:
         print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
@@ -339,14 +397,56 @@ for _run in range(NUM_RUNS):
 if(NUM_RUNS > 1):
     mean_test_acc = sum(all_acc)/len(all_acc)
     mean_test_loss = sum(all_loss)/len(all_loss)
+
+    print("Average Augmentation Bit Representation: ", [sum(i) for i in zip(*all_aug_bits)])
     print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_acc])
     print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_loss])
     print("\n")
 
     print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
     print("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+    print("\n")
 
-    utils.plot_run_stats(NUM_RUNS, all_acc, all_loss, DATASET,
-                        aug_bit = aug_bit, 
+    print("Best Results: ")
+    
+    print("\n")
+
+    info_dict = {'num_runs': NUM_RUNS,
+                 'dataset': DATASET,
+                 'encoder': ENCODER,
+                 'finetune': DO_FINETUNE,
+                 'experiment': EXPERIMENT}
+
+    utils.plot_run_stats(all_acc, all_loss, 
+                        info_dict=info_dict,
                         save_dir='saved_plots/', 
                         save_plot=SAVE_PLOTS)
+
+    
+    #f.write("\n")
+    f.write(" ########### SUMMARY ############ ")
+    f.write("\n")
+    f.write("Average Augmentation Bit Representation: {}".format([sum(i) for i in zip(*all_aug_bits)]))
+    f.write("\n")
+    f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_acc]))
+    f.write("\n")
+    f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_loss]))
+    f.write("\n")
+    f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
+    f.write("\n")
+    f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+    f.write("\n")
+    f.write("\n")
+
+    f.write(" ############# ALL RESULTS ############### \n")
+    #print the all_results dictionary here after sorting
+    sorted_results = utils.sort_dictionary(all_results)
+
+    pprint(sorted_results, f)
+    f.write("#############################################################################")
+    f.write("\n")
+    f.write("\n")
+    f.write("\n")
+    
+    f.close()
+

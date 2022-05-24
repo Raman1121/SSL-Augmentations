@@ -32,7 +32,7 @@ import yaml
 from pprint import pprint
 
 
-with open('../conf/config_train.yaml') as file:
+with open('config_train.yaml') as file:
     yaml_data = yaml.safe_load(file)
 
 #################### DEFINE CONSTANTS ####################
