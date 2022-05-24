@@ -17,24 +17,26 @@ from pytorch_lightning.core.lightning import LightningModule
 
 
 class SupervisedModel(LightningModule):
-    def __init__(self, num_classes, batch_size, encoder='resnet50_supervised', lr_rate=0.001, 
+    def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50_supervised', lr_rate=0.001, 
                 lr_scheduler='none', do_finetune=True, activation='softmax', criterion='cross_entropy', 
                 multilable=False):
 
         super().__init__()
-        
-        self.encoder = encoder
+
         self.num_classes = num_classes
+        self.batch_size = batch_size
+        self.class_weights = class_weights
+        self.encoder = encoder
         self.learning_rate = lr_rate
         self.lr_scheduler = lr_scheduler
-        self.batch_size = batch_size
         self.activation = activation
         self.multilable = multilable
+        
         #self.criterion = nn.BCELoss()
         
         if(criterion == 'cross_entropy'):
             #self.criterion = nn.functional.cross_entropy()  #This combines log_softmax with cross_entropy
-            self.criterion = nn.CrossEntropyLoss()
+            self.criterion = nn.CrossEntropyLoss(weight=self.class_weights)
         elif(criterion == 'bce'):
             #self.criterion = nn.BCEWithLogitsLoss()         #This combines sigmoid with BCE.
             self.criterion = nn.BCELoss()

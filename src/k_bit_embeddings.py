@@ -15,6 +15,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
 
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 
 import albumentations as A
 from albumentations.augmentations.transforms import *
@@ -61,6 +62,7 @@ AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
 NUM_RUNS = args.num_runs
 SAVE_PLOTS = yaml_data['run']['save_plots']
 EXPERIMENT = yaml_data['run']['experiment']
+LOG_FOLDER = yaml_data['run']['log_folder']
 DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
@@ -78,7 +80,7 @@ SAVED_MODELS_DIR = '../Saved_models'
 
 #Save results to a text file
 filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
-f = open(filename, "a")
+f = open(os.path.join(LOG_FOLDER, filename), "a")
 f.write("EXPERIMENT DATE: {}".format(date.today()))
 f.write("\n")
 
@@ -129,7 +131,6 @@ all_results = {
 for _run in range(NUM_RUNS):
 
     print(" ################## Starting Run {} ################## ".format(_run+1))
-    f.write
     all_runs.append(_run+1)
 
     #Load the train set
@@ -173,6 +174,12 @@ for _run in range(NUM_RUNS):
         '''
         Preparing the Diabetic Retinopathy dataset
         '''
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                             classes = np.unique(main_df['level']), 
+                                             y = main_df['level'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
         
         #Load the test set for DR dataset
         TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
@@ -206,6 +213,12 @@ for _run in range(NUM_RUNS):
         '''
 
         #NOTE: Val and Test data for this dataset has not been provided!
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                             classes = np.unique(main_df['cell_type_idx']), 
+                                             y = main_df['cell_type_idx'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
 
         # Creating training and test splits
         train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
@@ -263,6 +276,7 @@ for _run in range(NUM_RUNS):
         ACTIVATION = 'sigmoid'
         LOSS_FN = 'bce'
         MULTILABLE = True
+        CLASS_WEIGHTS = None
 
     elif(DATASET == 'mura'):
         '''
@@ -270,6 +284,12 @@ for _run in range(NUM_RUNS):
         '''
 
         #NOTE: Test data for this dataset has not been provided!
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                             classes = np.unique(main_df['label']), 
+                                             y = main_df['label'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
 
         VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
         val_df = pd.read_csv(VAL_DF_PATH)
@@ -318,7 +338,7 @@ for _run in range(NUM_RUNS):
 
     
     model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
-                                            lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
+                                            class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                             do_finetune=DO_FINETUNE, 
                                             activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 

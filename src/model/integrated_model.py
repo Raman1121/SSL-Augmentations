@@ -34,6 +34,34 @@ class IntegratedModel(LightningModule):
         for p in self.encoder.parameters():
             p.requires_grad = False
 
+    def calculate_acc(self, probs, true_labels, multilable=False):
+
+        acc = -9999
+
+        if(multilable):
+            #TODO: Calculate class-wise accuracy
+
+            N,C = true_labels.shape
+
+            probs = probs.cpu().detach().numpy()
+            true_labels = true_labels.cpu().detach().numpy()
+
+            for prob in probs:
+                prob[prob >= 0.5] = 1
+                prob[prob < 0.5] = 0
+            
+            
+            #acc = sum((probs == true_labels).astype('int') * true_labels)/len(probs)
+            acc = (probs == true_labels).sum()/(N*C)
+
+        else:
+            _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
+            print(_arr, _counts/_counts.sum()*100)
+            #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
+            acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
+            
+        return acc
+
     def training_step(self, batch, batch_idx):
         image, labels = batch
 

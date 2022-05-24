@@ -503,6 +503,10 @@ if __name__ == '__main__':
         test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
                                                             transforms=train_transform, subset=SUBSET)
 
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
+
     elif(DATASET == 'cancer_mnist'):
 
         '''
@@ -522,6 +526,10 @@ if __name__ == '__main__':
 
         test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
                                                                 subset=SUBSET)
+
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
 
     elif(DATASET == 'chexpert'):
         '''
@@ -548,6 +556,10 @@ if __name__ == '__main__':
 
         test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
                                                         subset=SUBSET)
+
+        ACTIVATION = 'sigmoid'
+        LOSS_FN = 'bce'
+        MULTILABLE = True
         
     elif(DATASET == 'mura'):
         '''
@@ -575,7 +587,9 @@ if __name__ == '__main__':
         test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
                                                                 subset=SUBSET)
                                           
-
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
 
     #######################################################################################
 
