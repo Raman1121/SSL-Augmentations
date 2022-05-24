@@ -37,7 +37,7 @@ run:
   experiment: 'k_bit_embeddings'
   do_finetune: True
   lr_scheduler: 'cyclic'
-  encoder: 'simclr'
+  encoder: 'resnet50'
 
   
 

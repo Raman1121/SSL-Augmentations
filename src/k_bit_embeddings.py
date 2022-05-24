@@ -76,11 +76,17 @@ NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
 #SAVING CONSTANTS
 SAVED_MODELS_DIR = '../Saved_models'
 
-pprint(yaml_data)
-print("Dataset: ", DATASET)
-print("SUBSET: ", SUBSET)
-print("Number of Runs: ", NUM_RUNS)
-print("Saved Models dir: ", SAVED_MODELS_DIR)
+#Save results to a text file
+filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
+f = open(filename, "a")
+f.write("EXPERIMENT DATE: {}".format(date.today()))
+f.write("\n")
+
+pprint(yaml_data, f)
+print("Dataset: {}".format(DATASET), f)
+print("SUBSET: {}".format(SUBSET), f)
+print("Number of Runs: {}".format(NUM_RUNS), f)
+print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
 if(EXPERIMENTAL_RUN):
     EPOCHS = 1
@@ -119,13 +125,6 @@ all_results = {
                 'k_bit_representation': [0]*len(aug_dict),
                 'run': []
                 }
-
-#Save results to a text file
-filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
-f = open(filename, "a")
-f.write("EXPERIMENT DATE: {}".format(date.today()))
-f.write("\n")
-
 
 for _run in range(NUM_RUNS):
 
@@ -447,6 +446,6 @@ if(NUM_RUNS > 1):
     f.write("\n")
     f.write("\n")
     f.write("\n")
-    
+
     f.close()
 
