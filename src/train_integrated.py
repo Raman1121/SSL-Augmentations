@@ -471,8 +471,6 @@ if __name__ == '__main__':
         T.ToTensor()
     ])
 
-    basic_transform = A.Compose([Resize(224, 224)])
-
     #Load the train set
     main_df = pd.read_csv(TRAIN_DF_PATH)
 
@@ -503,7 +501,7 @@ if __name__ == '__main__':
                                                             transforms=train_transform, subset=SUBSET)
 
         test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=basic_transform, subset=SUBSET)
+                                                            transforms=train_transform, subset=SUBSET)
 
     elif(DATASET == 'cancer_mnist'):
 
@@ -522,7 +520,7 @@ if __name__ == '__main__':
         train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
                                                                 subset=SUBSET)
 
-        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=basic_transform, 
+        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
                                                                 subset=SUBSET)
 
     elif(DATASET == 'chexpert'):
@@ -548,7 +546,7 @@ if __name__ == '__main__':
         val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
                                                         subset=SUBSET)
 
-        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
+        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
                                                         subset=SUBSET)
         
     elif(DATASET == 'mura'):
@@ -574,7 +572,7 @@ if __name__ == '__main__':
         val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
                                                                 subset=SUBSET)
 
-        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 
+        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
                                                                 subset=SUBSET)
                                           
 

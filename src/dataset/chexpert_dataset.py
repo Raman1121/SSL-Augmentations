@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision import transforms as T
-from torchvision.io import read_image
+from torchvision.io import read_image, ImageReadMode
 import pytorch_lightning as pl
 import albumentations as A
 
