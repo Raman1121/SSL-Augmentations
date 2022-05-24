@@ -10,7 +10,7 @@ from torch.optim import Adam
 from torch.nn.functional import cross_entropy
 
 import numpy as np
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 import torchvision.models as models
 from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
@@ -114,6 +114,31 @@ class SupervisedModel(LightningModule):
             
         return acc
 
+
+    def calculate_f1(self, probs, true_labels, multilable=False):
+
+        if(multilable):
+            N,C = true_labels.shape
+
+            probs = probs.cpu().detach().numpy()
+            true_labels = true_labels.cpu().detach().numpy()
+
+            for prob in probs:
+                prob[prob >= 0.5] = 1
+                prob[prob < 0.5] = 0
+
+            f1 = f1_score(true_labels, probs, average='weighted')
+
+        else:
+            predicted_labels = np.argmax(probs.cpu().detach().numpy(), axis=1)
+            true_labels = true_labels.cpu().data.view(-1).numpy()
+
+            f1 = f1_score(true_labels, predicted_labels, average='weighted')
+
+        return f1
+
+
+
     def training_step(self, batch, batch_idx):
 
         #total_acc = 0
@@ -136,19 +161,12 @@ class SupervisedModel(LightningModule):
             probabilities = torch.softmax(logits, dim=1)    #Normalized
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
             
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
-            
-
-        #print("representations: ", representations.shape)
-        #print("logits: ", logits.shape)
-        #print("logits max: ", torch.max(logits, dim=1))
-        #print("probabilities: ", probabilities)
-        #print("labels: ", labels)
-                    
-        #loss = self.criterion(torch.max(logits, dim=1).values, labels)  #We are using outputs here since our loss function applies final activation automatically.
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
 
         #Calculate loss using probabilities
         loss = self.criterion(probabilities, labels)
@@ -156,8 +174,9 @@ class SupervisedModel(LightningModule):
         #Logging metrics
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('f1_score', f1, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return {'acc':acc, 'loss':loss}
+        return {'acc':acc, 'loss':loss, 'f1_score':f1}
 
 
     def validation_step(self, batch, batch_idx):
@@ -178,10 +197,12 @@ class SupervisedModel(LightningModule):
             probabilities = torch.softmax(logits, dim=1)    #Normalized
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
             
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
 
         #Calculate loss using probabilities
         loss = self.criterion(probabilities, labels)
@@ -189,8 +210,9 @@ class SupervisedModel(LightningModule):
         #Logging metrics
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('f1_score', f1, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return {'acc':acc, 'loss':loss}
+        return {'acc':acc, 'loss':loss, 'f1_score':f1}
         
 
 
@@ -212,10 +234,12 @@ class SupervisedModel(LightningModule):
             probabilities = torch.softmax(logits, dim=1)    #Normalized
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
             
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
+            f1 = self.calculate_f1(probabilities, labels, self.multilable)
 
         #Calculate loss using probabilities
         loss = self.criterion(probabilities, labels)
@@ -223,8 +247,9 @@ class SupervisedModel(LightningModule):
         #Logging metrics
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        self.log('f1_score', f1, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
-        return {'acc':acc, 'loss':loss}
+        return {'acc':acc, 'loss':loss, 'f1_score':f1}
         
     def configure_optimizers(self):
         #optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.learning_rate)

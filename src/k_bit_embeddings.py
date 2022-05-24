@@ -92,7 +92,7 @@ print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
 if(EXPERIMENTAL_RUN):
     EPOCHS = 1
-    AUTO_LR_FIND = True
+    AUTO_LR_FIND = False
 
 # logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
 # logging.info("YAML DATA: f'{yaml_data}")
@@ -117,6 +117,7 @@ aug_dict = {CLAHE(p=transform_prob): 1,
 
 all_acc = []
 all_loss = []
+all_f1 = []
 all_aug_bits = []
 all_runs = []
 
@@ -124,6 +125,7 @@ all_runs = []
 all_results = {
                 'acc': [],
                 'loss': [],
+                'f1': [],
                 'k_bit_representation': [0]*len(aug_dict),
                 'run': []
                 }
@@ -368,6 +370,7 @@ for _run in range(NUM_RUNS):
         
         run_acc = test_results[0]['test_acc']
         run_loss = test_results[0]['test_loss']
+        run_f1 = test_results[0]['f1_score']
 
         # try:
 
@@ -395,16 +398,19 @@ for _run in range(NUM_RUNS):
 
         all_acc.append(run_acc)
         all_loss.append(run_loss)
+        all_f1.append(run_f1)
         #print(test_results)
 
         #Saving results from all the runs
         all_results['acc'] = all_acc
         all_results['loss'] = all_loss
+        all_results['f1'] = all_f1
         all_results['k_bit_representation'] = all_aug_bits
         all_results['run'] = all_runs
 
         print("Test Accuracy for run {} is: {}".format(_run+1, run_acc))
         print("Test Loss for run {} is: {}".format(_run+1, run_loss))
+        print("F1 Score for run {} is: {}".format(_run+1, run_f1))
         print("#######################################################")
         print('\n')
 
@@ -416,17 +422,19 @@ for _run in range(NUM_RUNS):
 if(NUM_RUNS > 1):
     mean_test_acc = sum(all_acc)/len(all_acc)
     mean_test_loss = sum(all_loss)/len(all_loss)
+    mean_test_f1 = sum(all_f1)/len(all_f1)
 
     print("Average Augmentation Bit Representation: ", [sum(i) for i in zip(*all_aug_bits)])
     print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_acc])
     print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_loss])
+    print("Deviation from mean F1 in each run: ", [x - mean_test_f1 for x in all_f1])
     print("\n")
 
     print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
     print("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+    print("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
     print("\n")
 
-    print("Best Results: ")
     
     print("\n")
 
@@ -451,9 +459,14 @@ if(NUM_RUNS > 1):
     f.write("\n")
     f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_loss]))
     f.write("\n")
+    f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_f1]))
+    f.write("\n")
     f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
     f.write("\n")
     f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+    f.write("\n")
+    f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
+    f.write("\n")
     f.write("\n")
     f.write("\n")
 

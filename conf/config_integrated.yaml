@@ -29,11 +29,11 @@ all_datasets:
 
 run:
   batch_size: 256
-  lr_rate: 0.01
+  lr_rate: 0.0003
   epochs: 30
   subset: null
   auto_lr_find: True
-  save_plots: False
+  save_plots: True
   experiment: 'k_bit_embeddings'
   log_folder: 'log_files'
   do_finetune: False

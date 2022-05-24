@@ -121,16 +121,18 @@ def sort_dictionary(results_dict):
     
     all_acc = results_dict['acc']
     all_loss = results_dict['loss']
+    all_f1 = results_dict['f1']
     all_repr = results_dict['k_bit_representation']
     all_runs = results_dict['run']
 
-    l1, l2, l3, l4 = (list(t) for t in zip(*sorted(zip(all_acc, all_loss, all_repr, all_runs), reverse=True)))
+    l1, l2, l3, l4, l5 = (list(t) for t in zip(*sorted(zip(all_acc, all_loss, all_f1, all_repr, all_runs), reverse=True)))
 
     sorted_dict = {}
     sorted_dict['acc'] = l1
     sorted_dict['loss'] = l2
-    sorted_dict['k_bit_representation'] = l3
-    sorted_dict['run'] = l4
+    sorted_dict['f1'] = l3
+    sorted_dict['k_bit_representation'] = l4
+    sorted_dict['run'] = l5
 
     return sorted_dict
 
