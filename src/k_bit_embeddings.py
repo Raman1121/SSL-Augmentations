@@ -92,7 +92,7 @@ print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
 if(EXPERIMENTAL_RUN):
     EPOCHS = 1
-    AUTO_LR_FIND = False
+    AUTO_LR_FIND = True
 
 # logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
 # logging.info("YAML DATA: f'{yaml_data}")
@@ -347,7 +347,7 @@ for _run in range(NUM_RUNS):
                         )
 
     if(AUTO_LR_FIND):
-        lr_finder = trainer.tuner.lr_find(model, train_image_loader)
+        lr_finder = trainer.tuner.lr_find(model, train_image_loader, update_attr=True)
         new_lr = lr_finder.suggestion()
         print("New suggested learning rate is: ", new_lr)
         model.hparams.learning_rate = new_lr
