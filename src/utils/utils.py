@@ -110,11 +110,36 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
 
         #save_path = os.path.join(save_dir, dataset+'.png')
 
-        plt.savefig(save_dir+dataset+'_'+str(num_runs)+'_'+encoder+'.png')
+        plt.savefig(save_dir + experiment + '_' + dataset +'_' + str(num_runs) + '_' + encoder + '.png')
             
         
     else:
         print("Saving plot skipped.")
+
+
+def gen_binomial_dict(aug_dict):
+    '''
+    A function to obtain augmentations through binomial sampling
+    '''
+
+    temp_dict = {}
+    for k, v in aug_dict.items():
+        temp_dict[v] = k
+
+    aug_bit = []
+    for i in range(len(aug_dict)):
+        s = np.random.binomial(1, 0.5)          #Each augmentation has a probability of 0.5
+        aug_bit.append(s)
+
+    #Finding indexes where aug_bit is 1
+    result = np.where(np.array(aug_bit) == 1)
+    indexes = result[0] + 1
+
+    aug_list = []
+    for index in indexes:
+        aug_list.append(temp_dict[index])
+
+    return aug_list, aug_bit
 
 
 def sort_dictionary(results_dict):

@@ -66,6 +66,7 @@ LOG_FOLDER = yaml_data['run']['log_folder']
 DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
+LOGGING = True
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -78,21 +79,26 @@ NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
 #SAVING CONSTANTS
 SAVED_MODELS_DIR = '../Saved_models'
 
-#Save results to a text file
-filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
-f = open(os.path.join(LOG_FOLDER, filename), "a")
-f.write("EXPERIMENT DATE: {}".format(date.today()))
-f.write("\n")
-
-pprint(yaml_data, f)
-print("Dataset: {}".format(DATASET), f)
-print("SUBSET: {}".format(SUBSET), f)
-print("Number of Runs: {}".format(NUM_RUNS), f)
-print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
-
 if(EXPERIMENTAL_RUN):
     EPOCHS = 1
     AUTO_LR_FIND = False
+    LOGGING = False
+
+if(LOGGING):
+
+    #Save results to a text file
+    filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
+    f = open(os.path.join(LOG_FOLDER, filename), "a")
+    f.write("EXPERIMENT DATE: {}".format(date.today()))
+    f.write("\n")
+
+    pprint(yaml_data, f)
+    print("Dataset: {}".format(DATASET), f)
+    print("SUBSET: {}".format(SUBSET), f)
+    print("Number of Runs: {}".format(NUM_RUNS), f)
+    print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
+
+
 
 # logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
 # logging.info("YAML DATA: f'{yaml_data}")
@@ -142,23 +148,29 @@ for _run in range(NUM_RUNS):
     run_loss = 0        #Initialize new loss for each run
     run_f1 = 0          #Initialize new F1 score for each run
 
-    aug_bit = [0]*len(aug_dict)
+    # aug_bit = [0]*len(aug_dict)
 
-    print("Number of augmentations: ", len(aug_dict))
-    #randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
-    randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
+    # # print("Number of augmentations: ", len(aug_dict))
+    # # randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
+    # randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
 
-    print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
-    print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
+    # print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
+    # #print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
 
-    for aug in randomly_selected_augs:
-        index = aug_dict[aug] - 1
-        aug_bit[index] = 1
+    # for aug in randomly_selected_augs:
+    #     index = aug_dict[aug] - 1
+    #     aug_bit[index] = 1
         
-    print(aug_bit)
+    # print(aug_bit)
+    # all_aug_bits.append(aug_bit)
+
+    randomly_selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
+    print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
+    #print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
+    print("Augmentation bit representation: {}".format(aug_bit))
     all_aug_bits.append(aug_bit)
 
-    #raise SystemExit(0)
+    # raise SystemExit(0)
 
     #Add required basic transforms here.
     randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
@@ -452,34 +464,35 @@ if(NUM_RUNS > 1):
 
     
     #f.write("\n")
-    f.write(" ########### SUMMARY ############ ")
-    f.write("\n")
-    f.write("Average Augmentation Bit Representation: {}".format([sum(i) for i in zip(*all_aug_bits)]))
-    f.write("\n")
-    f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_acc]))
-    f.write("\n")
-    f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_loss]))
-    f.write("\n")
-    f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_f1]))
-    f.write("\n")
-    f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
-    f.write("\n")
-    f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
-    f.write("\n")
-    f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
-    f.write("\n")
-    f.write("\n")
-    f.write("\n")
+    if(LOGGING):
+        f.write(" ########### SUMMARY ############ ")
+        f.write("\n")
+        f.write("Average Augmentation Bit Representation: {}".format([sum(i) for i in zip(*all_aug_bits)]))
+        f.write("\n")
+        f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_acc]))
+        f.write("\n")
+        f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_loss]))
+        f.write("\n")
+        f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_f1]))
+        f.write("\n")
+        f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
+        f.write("\n")
+        f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+        f.write("\n")
+        f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
+        f.write("\n")
+        f.write("\n")
+        f.write("\n")
 
-    f.write(" ############# ALL RESULTS ############### \n")
-    #print the all_results dictionary here after sorting
-    sorted_results = utils.sort_dictionary(all_results)
+        f.write(" ############# ALL RESULTS ############### \n")
+        #print the all_results dictionary here after sorting
+        sorted_results = utils.sort_dictionary(all_results)
 
-    pprint(sorted_results, f)
-    f.write("#############################################################################")
-    f.write("\n")
-    f.write("\n")
-    f.write("\n")
+        pprint(sorted_results, f)
+        f.write("#############################################################################")
+        f.write("\n")
+        f.write("\n")
+        f.write("\n")
 
-    f.close()
+        f.close()
 
