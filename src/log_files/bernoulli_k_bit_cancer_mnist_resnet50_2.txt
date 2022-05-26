@@ -1,0 +1,56 @@
+EXPERIMENT DATE: 2022-05-25
+{'all_datasets': {'cancer_mnist': {'num_classes': 7,
+                                   'root_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/',
+                                   'train_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/HAM10000_modified_metadata.csv'},
+                  'chexpert': {'num_classes': 14,
+                               'root_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/',
+                               'train_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/train_final.csv',
+                               'val_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CheXpert_dataset/CheXpert-v1.0-small/valid_final.csv'},
+                  'mura': {'num_classes': 2,
+                           'root_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/',
+                           'train_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/train_paths_with_labels.csv',
+                           'val_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/MURA_dataset/MURA-v1.1/valid_paths_with_labels.csv'},
+                  'retinopathy': {'num_classes': 5,
+                                  'root_path': '/home/co-dutt1/rds/hpc-work/MLP-RIQA/data/diabetic-retinopathy-detection/',
+                                  'test_cat_labels': ['Good',
+                                                      'Usable',
+                                                      'Reject'],
+                                  'test_df_path': '/home/co-dutt1/rds/hpc-work/MLP-RIQA/Test_set_RIQA_DR_Labels.csv',
+                                  'train_cat_labels': ['Good',
+                                                       'Usable',
+                                                       'Reject'],
+                                  'train_df_path': '/home/co-dutt1/rds/hpc-work/MLP-RIQA/Train_set_RIQA_DR_Labels.csv',
+                                  'val_cat_labels': ['Good',
+                                                     'Usable',
+                                                     'Reject']}},
+ 'run': {'auto_lr_find': False,
+         'batch_size': 256,
+         'do_finetune': False,
+         'encoder': 'resnet50',
+         'epochs': 1,
+         'experiment': 'bernoulli_k_bit',
+         'log_folder': 'log_files',
+         'lr_rate': 0.0003,
+         'lr_scheduler': 'cyclic',
+         'save_plots': True,
+         'subset': None}}
+ ########### SUMMARY ############ 
+Average Augmentation Bit Representation: [1, 1, 1, 1, 1, 2, 1, 1, 1]
+Deviation from mean accuracy in each run: [0.1511019617319107, -0.1511019617319107]
+Deviation from mean loss in each run: [0.01170116662979126, -0.01170116662979126]
+Deviation from mean F1 in each run:[0.12224409555296045, -0.1222440955529604] 
+Standard Deviation for test accuracy across all runs: 0.1511019617319107
+Standard Deviation for test loss across all runs: 0.01170116662979126
+Standard Deviation for F1 score across all runs: 0.12224409555296042
+
+
+ ############# ALL RESULTS ############### 
+{'acc': [0.6808810830116272, 0.3786771595478058],
+ 'f1': [0.6601650025985398, 0.415676811492619],
+ 'k_bit_representation': [[1, 0, 1, 1, 1, 1, 1, 1, 0],
+                          [0, 1, 0, 0, 0, 1, 0, 0, 1]],
+ 'loss': [1.7768021821975708, 1.7533998489379883],
+ 'run': [1, 2]}
+#############################################################################
+
+

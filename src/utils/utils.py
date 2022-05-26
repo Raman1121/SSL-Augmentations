@@ -7,6 +7,11 @@ from pytorch_lightning.core.lightning import LightningModule
 from pl_bolts.datasets import DummyDataset
 from dataset import retinopathy_dataset
 
+from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
+
+from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
+
 import torch
 import os
 import pandas as pd
@@ -49,35 +54,221 @@ def get_dummy_dataset(input_shape=(3, 224, 224), label_shape=(1,), num_samples=1
 
     return dummy_ds
 
-def load_DR_dataset(yaml_data, train_transforms, test_transforms):
+def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
 
-    ROOT_PATH = yaml_data['DR_DATASET']['root_path']
-    DR_TRAIN_DF_PATH = yaml_data['DR_DATASET']['train_df_path']
-    DR_TEST_DF_PATH = yaml_data['DR_DATASET']['test_df_path']
+    #Dataset constants
+    DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
+    TRAIN_DF_PATH = yaml_data['all_datasets'][DATASET]['train_df_path']
+    VALIDATION_SPLIT = 0.3
+    TEST_SPLIT = 0.2
+    SEED = 42
+    NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
+    BATCH_SIZE = yaml_data['run']['batch_size']
+    SUBSET = yaml_data['run']['subset']
 
-    train_df = pd.read_csv(DR_TRAIN_DF_PATH)
-    test_df = pd.read_csv(DR_TEST_DF_PATH)
+    main_df = pd.read_csv(TRAIN_DF_PATH)
 
-    train_df['image'] = train_df['image'].apply(lambda x: str(ROOT_PATH+'final_train/train/'+x))
-    test_df['image'] = test_df['image'].apply(lambda x: str(ROOT_PATH+'final_test/test/'+x))
+    train_dataset = None
+    val_dataset = None
+    test_dataset = None
 
-    train_dataset = retinopathy_dataset.RetinopathyDataset(df=train_df, transforms=train_transforms)
-    test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, transforms=test_transforms)
+    if(DATASET == 'retinopathy'):
+
+        '''
+        Preparing the Diabetic Retinopathy dataset
+        '''
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                            classes = np.unique(main_df['level']), 
+                                            y = main_df['level'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
+        
+        #Load the test set for DR dataset
+        TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
+        test_df = pd.read_csv(TEST_DF_PATH)
+
+        TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
+        VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
+        TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
+
+        main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
+        test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
+
+        # Creating training and validation splits
+        train_df, val_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+        train_df = train_df.reset_index(drop=True)
+        val_df = val_df.reset_index(drop=True)
+
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+        TRAIN_SUBSET = len(main_df) if len(main_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+
+        train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
+                                                            transforms=train_transform, subset=TRAIN_SUBSET)
+
+        val_dataset = retinopathy_dataset.RetinopathyDataset(df=val_df, cat_labels_to_include=VAL_CAT_LABELS, 
+                                                            transforms=train_transform, subset=VAL_SUBSET)
+
+        test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
+                                                            transforms=basic_transform, subset=TEST_SUBSET)
+                                                        
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
+
+    elif(DATASET == 'cancer_mnist'):
+
+        '''
+        Preparing the Cancer MNIST dataset
+        '''
+
+        #NOTE: Val and Test data for this dataset has not been provided!
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                            classes = np.unique(main_df['cell_type_idx']), 
+                                            y = main_df['cell_type_idx'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
+
+        # Creating training, validation, and test splits
+        _, val_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        _ = _.reset_index(drop=True)
+        val_df = val_df.reset_index(drop=True)
+
+        train_df, test_df = train_test_split(_, test_size=TEST_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+        
+
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+
+        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
+                                                                subset=TRAIN_SUBSET)
+
+        val_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=val_df, transforms=train_transform, 
+                                                                subset=VAL_SUBSET)
+
+        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=basic_transform, 
+                                                                subset=TEST_SUBSET)
+
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
+
+    elif(DATASET == 'chexpert'):
+        '''
+        Preparing the CheXpert dataset
+        '''
+        #NOTE: Test data for this dataset has not been provided!
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+        
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+
+        train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
+                                                        subset=TRAIN_SUBSET)
+
+        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
+                                                        subset=VAL_SUBSET)
+
+        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
+                                                        subset=TEST_SUBSET)
+                                                
+
+        ACTIVATION = 'sigmoid'
+        LOSS_FN = 'bce'
+        MULTILABLE = True
+        CLASS_WEIGHTS = None
+
+    elif(DATASET == 'mura'):
+        '''
+        Preparing the MURA dataset
+        '''
+
+        #NOTE: Test data for this dataset has not been provided!
+
+        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
+                                            classes = np.unique(main_df['label']), 
+                                            y = main_df['label'].to_numpy())
+
+        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
+
+        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
+        val_df = pd.read_csv(VAL_DF_PATH)
+
+        # Creating training and test splits
+        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
+                                    random_state=SEED)
+
+        train_df = train_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
+
+        #Checking if SUBSET size is greater than the size of the dataset itself.
+
+        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+
+        train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
+                                                                subset=TRAIN_SUBSET)
+
+        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
+                                                                subset=VAL_SUBSET)
+
+        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 
+                                                                subset=TEST_SUBSET)
+
+        ACTIVATION = 'softmax'
+        LOSS_FN = 'cross_entropy'
+        MULTILABLE = False
     
-    return train_dataset, test_dataset
+    #Creating Data Loaders
+    if(train_dataset != None):
+        print("Train dataset length: ", len(train_dataset))
+        train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
 
-def load_chexpert_dataset(yaml_data, train_transforms, test_transforms):
-    ROOT_PATH = yaml_data['CHEX_DATASET']['root_path']
-    CHEX_TRAIN_DF_PATH = yaml_data['CHEX_DATASET']['train_df_path']
-    CHEX_VALID_DF_PATH = yaml_data['CHEX_DATASET']['valid_df_path']
+    if(val_dataset != None):
+        print("Val dataset length: ", len(val_dataset))
+        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
-    train_df = pd.read_csv(CHEX_TRAIN_DF_PATH)
-    valid_df = pd.read_csv(CHEX_VALID_DF_PATH)
+    if(test_dataset != None):
+        print("Test dataset length: ", len(test_dataset))
+        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
-    train_df['Path'] = train_df['Path'].apply(lambda x: str(ROOT_PATH+x))
-    valid_df['Path'] = valid_df['Path'].apply(lambda x: str(ROOT_PATH+x))
 
-    pass
+    return_dict = {'train_image_loader': train_image_loader,
+                    'val_image_loader': val_image_loader,
+                    'test_image_loader': test_image_loader,
+                    'activation': ACTIVATION,
+                    'loss_fn': LOSS_FN,
+                    'multilable': MULTILABLE,
+                    'class_weights': CLASS_WEIGHTS
+                    }
+    
+    return return_dict
 
 def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_plot=True):
     if(save_plot):
