@@ -31,16 +31,16 @@ all_datasets:
 run:
   batch_size: 256
   lr_rate: 0.0003
-  inner_epochs: 5
+  inner_epochs: 10
   test_epochs: 15
   subset: null
-  auto_lr_find: False
+  auto_lr_find: True
   save_plots: False
   experiment: 'greedy_search'
   log_folder: 'log_files'
   do_finetune: False
   lr_scheduler: 'cyclic'
-  encoder: 'simclr'
+  encoder: 'resnet50'
 
   
 

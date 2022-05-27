@@ -18,6 +18,8 @@ import pandas as pd
 import numpy as np
 import yaml
 import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def check_data_loader(dl):
 
@@ -306,6 +308,37 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
         
     else:
         print("Saving plot skipped.")
+
+
+def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dict, 
+                              info_dict, save_dir='saved_plots/', save_plot=True):
+
+    dataset = info_dict['dataset']
+    encoder = info_dict['encoder']
+    finetune = info_dict['finetune']
+    experiment = info_dict['experiment']
+    
+    best_aug_list = sorted_test_results_dict['aug'][0]
+    best_aug_labels = sorted_test_results_dict['aug_label'][0]
+
+    include_vector = [0]*len(aug_dict)
+
+    for aug in list(aug_dict_labels.keys()):
+        if(aug in best_aug_labels):
+            index = aug_dict_labels[aug] - 1
+            include_vector[index] = 1
+
+    d = {'Augmentations': list(aug_dict_labels.keys()),
+         'Present': include_vector}
+    df = pd.DataFrame(d)
+
+    #plot = sns.heatmap(df, vmin=0, vmax=1, cbar=False, cmap="winter")
+    #fig = plot.get_figure()
+
+    # if(save_plot):
+    #     fig.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+
+    return include_vector
 
 
 def gen_binomial_dict(aug_dict):

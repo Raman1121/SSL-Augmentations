@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 import random
 import numpy as np
@@ -37,6 +38,8 @@ parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset 
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 
 args = parser.parse_args()
+
+start_time = time.time()
 
 with open('../conf/config_greedy.yaml') as file:
         yaml_data = yaml.safe_load(file)
@@ -140,17 +143,19 @@ all_f1 = []
 all_aug_bits = []
 all_runs = []
 
-# A dictionary to store the best results and corresponding bit representation from all runs
+# A dictionary to store the best augmentations and results from all runs
 test_results_dict = {'aug':[],
+                     'aug_label': [],
                      'f1':[]}
 
 while(len(all_aug_list) > 0):
 
     # A dictionary to store the augmentations and their corresponding results for each pass
     _aug_results = {'aug':[],
+                    'aug_label': [],
                     'f1':[]}
 
-    for _aug in all_aug_list:
+    for _aug, _aug_label in zip(all_aug_list, all_aug_labels_list):
         
         print("############# Initiating a new pass #############")
 
@@ -159,7 +164,7 @@ while(len(all_aug_list) > 0):
         run_loss = 0        #Initialize new loss for each pass
         run_f1 = 0          #Initialize new F1 score for each pass
 
-        print("Selecting augmentation: {}".format(_aug))
+        print("Selecting augmentation: {}".format(_aug_label))
 
         print("Number of augmentations remaining {}".format(len(all_aug_list)))
 
@@ -211,31 +216,38 @@ while(len(all_aug_list) > 0):
         
         #Add the current augmentation and f1 score to the results dictionary
         _aug_results['aug'] += [_aug]
+        _aug_results['aug_label'] += [_aug_label]
         _aug_results['f1'] += [run_f1]
 
     #Obtain the augmentation which gave the best f1 score for this pass
     sorted_dict = {}
     augmentations = _aug_results['aug']
+    augmentation_labels = _aug_results['aug_label']
     f1_scores = _aug_results['f1']
 
     #print("Augmentations: ", augmentations)
     print("f1 scores: ", f1_scores)
 
-    l1, l2 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations), reverse=True)))
+    l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentation_labels), reverse=True)))
 
-    sorted_dict['f1'] = f1_scores
-    sorted_dict['aug'] = augmentations
+    sorted_dict['f1'] = l1
+    sorted_dict['aug'] = l2
+    sorted_dict['aug_label'] = l3
 
     _best_augmentation = sorted_dict['aug'][0]
+    _best_augmentation_label = sorted_dict['aug_label'][0]
 
     print("Best augmentation in this pass: {}".format(_best_augmentation))
 
     all_selected_augs.append(_best_augmentation)    #Add this augmentation to the list of selected augmentations
+    all_selected_augs_labels.append(_best_augmentation_label)
     all_aug_list.remove(_best_augmentation)         #Remove this augmentation from the list of augmentations
+    all_aug_labels_list.remove(_best_augmentation_label)
 
     # Add this selection to the test results dictionary
 
     test_results_dict['aug'] += [all_selected_augs[:]]
+    test_results_dict['aug_label'] += [all_selected_augs_labels[:]]
 
 
 print(test_results_dict)
@@ -244,14 +256,16 @@ print(test_results_dict)
 
 print("############################################################# ")
 print("Initializing Testing Process \n")
-print("Initializing Testing Process \n", f)
 
-greedy_augmentations_list = test_results_dict['aug']     #List of Lists
+if(LOGGING):
+    print("Initializing Testing Process \n", f)
 
+greedy_augmentations_list = test_results_dict['aug']                #List of Lists
+greedy_augmentations_labels_list = test_results_dict['aug_label']   #List of Lists
 
 test_f1_scores = []
 
-for augmentations_list in greedy_augmentations_list:
+for augmentations_list, augmentations_labels_list in zip(greedy_augmentations_list, greedy_augmentations_labels_list):
 
     run_acc = 0
     run_loss = 0
@@ -306,25 +320,54 @@ test_results_dict['f1'] = test_f1_scores
 #Sort this dictionary
 sorted_test_results_dict = {}
 augmentations = test_results_dict['aug']
+augmentations_labels = test_results_dict['aug_label']
 f1_scores = test_results_dict['f1']
 
-l1, l2 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations), reverse=True)))
+l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentations_labels), reverse=True)))
 
 sorted_test_results_dict['f1'] = l1
 sorted_test_results_dict['aug'] = l2
+sorted_test_results_dict['aug_label'] = l3
 
 print("############################ FINAL TEST RESULTS AFTER SORTING ############################")
 print(sorted_test_results_dict)
-pprint(sorted_test_results_dict, f)
+
+if(LOGGING):
+    pprint(sorted_test_results_dict, f)
 
 print("################################### BEST AUGMENTATION AFTER GREEDY SEARCH ##########################")
 print(sorted_test_results_dict['aug'][0])
-pprint("Best augmentation after greedy search: {}".format(sorted_test_results_dict['aug'][0]), f)
+
+if(LOGGING):
+    pprint("Best augmentation after greedy search: {}".format(sorted_test_results_dict['aug'][0]), f)
 
 print("################################### BEST F1 SCORE AFTER GREEDY SEARCH ##########################")
 print(sorted_test_results_dict['f1'][0])
-pprint("Best F1 Score after greedy search: {}".format(sorted_test_results_dict['f1'][0]), f)
 
+if(LOGGING):
+    pprint("Best F1 Score after greedy search: {}".format(sorted_test_results_dict['f1'][0]), f)
+
+info_dict = {
+                 'dataset': DATASET,
+                 'encoder': ENCODER,
+                 'finetune': DO_FINETUNE,
+                 'experiment': EXPERIMENT
+            }
+
+aug_bit_vector = utils.plot_greedy_augmentations(aug_dict, aug_dict_labels, 
+                                sorted_test_results_dict,
+                                info_dict,
+                                save_plot=SAVE_PLOTS)
+
+end_time = time.time()
+
+print("Augmentation Bit Representation: {}".format(aug_bit_vector))
+print("Execution Time: {}".format(end_time - start_time))
+
+
+if(LOGGING):
+    pprint("Augmentation Bit Representation: {}".format(aug_bit_vector), f)
+    pprint("Execution Time: {}".format(end_time - start_time), f)
 
 
 
