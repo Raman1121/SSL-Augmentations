@@ -22,6 +22,7 @@ import albumentations as A
 from albumentations.augmentations.transforms import *
 from albumentations.augmentations.crops.transforms import *
 from albumentations.augmentations.geometric.rotate import *
+from albumentations.augmentations.geometric.transforms import *
 from albumentations.augmentations.geometric.resize import Resize
 
 from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
@@ -111,7 +112,7 @@ aug_dict = {CLAHE(p=transform_prob): 1,
             ColorJitter(p=transform_prob): 2,
             Downscale(p=transform_prob): 3,
             Emboss(p=transform_prob): 4,
-            Flip(p=transform_prob): 5,
+            ShiftScaleRotate(p=transform_prob): 5,
             HorizontalFlip(p=transform_prob): 6,
             VerticalFlip(p=transform_prob): 7,
             ImageCompression(p=transform_prob): 8,
@@ -123,7 +124,7 @@ aug_dict_labels = {'CLAHE': 1,
                    'ColorJitter': 2,
                    'Downscale': 3,
                    'Emboss': 4,
-                   'Flip': 5,
+                   'ShiftScaleRotate': 5,
                    'HorizontalFlip': 6,
                    'VerticalFlip': 7,
                    'ImageCompression': 8,
@@ -271,6 +272,10 @@ for augmentations_list, augmentations_labels_list in zip(greedy_augmentations_li
     run_loss = 0
     run_f1 = 0
 
+    print("Augmentations list for testing: ")
+    pprint(augmentations_list)
+    print('\n')
+
     augs_for_this_pass = [Resize(224, 224)] + augmentations_list
     train_transform = A.Compose(augs_for_this_pass)
     basic_transform = A.Compose([Resize(224, 224)])
@@ -325,26 +330,26 @@ f1_scores = test_results_dict['f1']
 
 l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentations_labels), reverse=True)))
 
+# pprint("TEST RESULTS DICT BEFORE SORTING: ")
+# pprint(test_results_dict)
+
 sorted_test_results_dict['f1'] = l1
 sorted_test_results_dict['aug'] = l2
 sorted_test_results_dict['aug_label'] = l3
 
 print("############################ FINAL TEST RESULTS AFTER SORTING ############################")
-print(sorted_test_results_dict)
+pprint(sorted_test_results_dict)
+    
+
+print("################################### BEST AUGMENTATION AFTER GREEDY SEARCH ##########################")
+pprint(sorted_test_results_dict['aug'][0])
+
+print("################################### BEST F1 SCORE AFTER GREEDY SEARCH ##########################")
+pprint(sorted_test_results_dict['f1'][0])
 
 if(LOGGING):
     pprint(sorted_test_results_dict, f)
-
-print("################################### BEST AUGMENTATION AFTER GREEDY SEARCH ##########################")
-print(sorted_test_results_dict['aug'][0])
-
-if(LOGGING):
     pprint("Best augmentation after greedy search: {}".format(sorted_test_results_dict['aug'][0]), f)
-
-print("################################### BEST F1 SCORE AFTER GREEDY SEARCH ##########################")
-print(sorted_test_results_dict['f1'][0])
-
-if(LOGGING):
     pprint("Best F1 Score after greedy search: {}".format(sorted_test_results_dict['f1'][0]), f)
 
 info_dict = {
@@ -369,6 +374,7 @@ if(LOGGING):
     pprint("Augmentation Bit Representation: {}".format(aug_bit_vector), f)
     pprint("Execution Time: {}".format(end_time - start_time), f)
 
+f.close()
 
 
 #raise SystemExit(0)

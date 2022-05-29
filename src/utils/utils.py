@@ -299,7 +299,7 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
         #plt.title(prefix)
 
         plt.legend()
-        plt.show()
+        
 
         #save_path = os.path.join(save_dir, dataset+'.png')
 
@@ -328,15 +328,19 @@ def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dic
             index = aug_dict_labels[aug] - 1
             include_vector[index] = 1
 
-    d = {'Augmentations': list(aug_dict_labels.keys()),
-         'Present': include_vector}
-    df = pd.DataFrame(d)
+    plt.figure(figsize=(16, 16))
 
-    #plot = sns.heatmap(df, vmin=0, vmax=1, cbar=False, cmap="winter")
-    #fig = plot.get_figure()
+    plot = plt.bar(list(aug_dict_labels.keys()), include_vector, width=0.8)
+    plt.xlabel('Augmentations')
+    plt.ylabel('Selected')
+    plt.yticks(np.arange(0, 2, step=1))
 
-    # if(save_plot):
-    #     fig.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+    plt.suptitle("Augmentations selected using greedy search for {} dataset".format(dataset))
+    plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
+    plt.show()
+
+    if(save_plot):
+        plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
 
     return include_vector
 
