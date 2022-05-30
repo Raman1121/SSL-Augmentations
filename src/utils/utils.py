@@ -344,6 +344,40 @@ def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dic
 
     return include_vector
 
+def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot=True, save_dir='saved_plots/'):
+    
+
+    dataset = info_dict['dataset']
+    encoder = info_dict['encoder']
+    finetune = info_dict['finetune']
+    experiment = info_dict['experiment']
+
+    plt.figure(figsize=(16, 25))
+    plt.suptitle("Augmentations selected using greedy search for {} dataset".format(dataset))
+    plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
+
+    for i in range(len(all_vectors)):
+        
+        _vec = all_vectors[i]
+        _ax = plt.subplot(3, 2, i + 1)
+
+        if(i == 4):
+            _ax.bar(list(aug_dict_labels.keys()), _vec, width=0.8, color='green')
+            _ax.set_title("Total number of times each augmentation was selected.")
+            #plt.xlabel('Augmentations')
+            plt.ylabel('Number of times selected')
+            plt.yticks(np.arange(0, 5, step=1))
+        
+        else:
+            _ax.bar(list(aug_dict_labels.keys()), _vec, width=0.8)
+            _ax.set_title("Plot for run {}".format(i+1))
+            #plt.xlabel('Augmentations')
+            plt.ylabel('Selected')
+            plt.yticks(np.arange(0, 2, step=1))
+    
+    if(save_plot):
+        plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+
 
 def gen_binomial_dict(aug_dict):
     '''

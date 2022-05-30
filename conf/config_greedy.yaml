@@ -35,8 +35,8 @@ run:
   test_epochs: 15
   subset: null
   auto_lr_find: True
-  save_plots: True
-  experiment: 'greedy_search'
+  save_plots: False
+  experiment: 'greedy_search_multiple_runs5'
   log_folder: 'log_files'
   do_finetune: False
   lr_scheduler: 'cyclic'

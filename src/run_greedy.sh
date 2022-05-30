@@ -6,5 +6,5 @@
 #SBATCH --account BMAI-CDT-SL2-GPU
 #SBATCH --time=30:00:00
 
-python greedy_search_augmentations.py --dataset chexpert 
+python greedy_search_augmentations.py --dataset mura 
 
