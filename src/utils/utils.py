@@ -112,7 +112,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
                                                             transforms=train_transform, subset=TRAIN_SUBSET)
 
         val_dataset = retinopathy_dataset.RetinopathyDataset(df=val_df, cat_labels_to_include=VAL_CAT_LABELS, 
-                                                            transforms=train_transform, subset=VAL_SUBSET)
+                                                            transforms=basic_transform, subset=VAL_SUBSET)
 
         test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
                                                             transforms=basic_transform, subset=TEST_SUBSET)
@@ -158,7 +158,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
         train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
 
-        val_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=val_df, transforms=train_transform, 
+        val_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=val_df, transforms=basic_transform, 
                                                                 subset=VAL_SUBSET)
 
         test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=basic_transform, 
@@ -193,7 +193,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
         train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
                                                         subset=TRAIN_SUBSET)
 
-        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
+        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=basic_transform,
                                                         subset=VAL_SUBSET)
 
         test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
@@ -237,7 +237,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
         train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
 
-        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
+        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=basic_transform,
                                                                 subset=VAL_SUBSET)
 
         test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 

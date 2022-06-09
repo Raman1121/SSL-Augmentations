@@ -283,7 +283,7 @@ for _run in range(NUM_RUNS):
         train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
                                                         subset=TRAIN_SUBSET)
 
-        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
+        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=basic_transform,
                                                         subset=VAL_SUBSET)
 
         test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
@@ -327,7 +327,7 @@ for _run in range(NUM_RUNS):
         train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
                                                                 subset=TRAIN_SUBSET)
 
-        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
+        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=basic_transform,
                                                                 subset=VAL_SUBSET)
 
         test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 
