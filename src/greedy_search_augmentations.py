@@ -93,7 +93,7 @@ if(LOGGING):
 
     #Save results to a text file
     filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '.txt'
-    f = open(os.path.join(LOG_FOLDER, filename), "a")
+    f = open(os.path.join(LOG_FOLDER, filename), "w")
     f.write("EXPERIMENT DATE: {}".format(date.today()))
     f.write("\n")
 
@@ -104,19 +104,19 @@ if(LOGGING):
 
 
 
-transform_prob = 1
+#transform_prob = 1
 crop_height = 224
 crop_width = 224
 
-aug_dict = {CLAHE(p=transform_prob): 1,
-            ColorJitter(p=transform_prob): 2,
-            Downscale(p=transform_prob): 3,
-            Emboss(p=transform_prob): 4,
-            ShiftScaleRotate(p=transform_prob): 5,
-            HorizontalFlip(p=transform_prob): 6,
-            VerticalFlip(p=transform_prob): 7,
-            ImageCompression(p=transform_prob): 8,
-            Rotate(p=transform_prob): 9
+aug_dict = {CLAHE(): 1,
+            ColorJitter(): 2,
+            Downscale(): 3,
+            Emboss(): 4,
+            ShiftScaleRotate(): 5,
+            HorizontalFlip(): 6,
+            VerticalFlip(): 7,
+            ImageCompression(): 8,
+            Rotate(): 9
             }
 
 # Make sure to maintain the same order of augmentations here as in aug_dict dictionary
@@ -227,7 +227,9 @@ while(len(all_aug_list) > 0):
     f1_scores = _aug_results['f1']
 
     #print("Augmentations: ", augmentations)
-    print("f1 scores: ", f1_scores)
+    print("f1 scores [0]: ", f1_scores[0])
+    print("augmentations [0]: ", augmentations[0])
+    print("augmentation_labels [0]: ", augmentation_labels[0])
 
     l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentation_labels), reverse=True)))
 
@@ -374,7 +376,7 @@ if(LOGGING):
     pprint("Augmentation Bit Representation: {}".format(aug_bit_vector), f)
     pprint("Execution Time: {}".format(end_time - start_time), f)
 
-f.close()
+    f.close()
 
 
 #raise SystemExit(0)

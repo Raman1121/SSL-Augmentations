@@ -103,22 +103,24 @@ if(LOGGING):
 # logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
 # logging.info("YAML DATA: f'{yaml_data}")
 
-transform_prob = 1
+#transform_prob = 1
 #crop_height = int(0.7*224) #Assuming all images would be 224x224
 #crop_width = int(0.7*224)  #Assuming all images would be 224x224
 
 crop_height = 224
 crop_width = 224
 
-aug_dict = {CLAHE(p=transform_prob): 1,
-            ColorJitter(p=transform_prob): 2,
-            Downscale(p=transform_prob): 3,
-            Emboss(p=transform_prob): 4,
-            Flip(p=transform_prob): 5,
-            HorizontalFlip(p=transform_prob): 6,
-            VerticalFlip(p=transform_prob): 7,
-            ImageCompression(p=transform_prob): 8,
-            Rotate(p=transform_prob): 9}
+aug_dict = {
+            CLAHE(): 1,
+            ColorJitter(): 2,
+            Downscale(): 3,
+            Emboss(): 4,
+            Flip(): 5,
+            HorizontalFlip(): 6,
+            VerticalFlip(): 7,
+            ImageCompression(): 8,
+            Rotate(): 9
+            }
 
 
 all_acc = []
