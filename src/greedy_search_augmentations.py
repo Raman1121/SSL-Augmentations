@@ -160,6 +160,9 @@ while(len(all_aug_list) > 0):
         
         print("############# Initiating a new pass #############")
 
+        if(LOGGING):
+            print("############# Initiating a new pass #############", f)
+
         
         run_acc = 0         #Initialize new accuracy for each pass
         run_loss = 0        #Initialize new loss for each pass
@@ -241,6 +244,11 @@ while(len(all_aug_list) > 0):
     _best_augmentation_label = sorted_dict['aug_label'][0]
 
     print("Best augmentation in this pass: {}".format(_best_augmentation))
+
+    if(LOGGING):
+        print(" ########################################################## ", f)
+        print("Best augmentation in this pass: {}".format(_best_augmentation), f)
+        print("Best F1 Score for this pass: {}".format(sorted_dict['f1'][0]), f)
 
     all_selected_augs.append(_best_augmentation)    #Add this augmentation to the list of selected augmentations
     all_selected_augs_labels.append(_best_augmentation_label)

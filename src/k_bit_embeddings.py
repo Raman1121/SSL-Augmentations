@@ -36,6 +36,7 @@ parser = argparse.ArgumentParser(description='Hyper-parameters management')
 parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 parser.add_argument('--num_runs', type=int, default=1, help='Number of runs for a dataset. Different augmentations will be randomly samples in each run.')
+parser.add_argument('--run_baseline', type=str, default=None, help='Run baseline experiments with all or no augmentations')
 
 args = parser.parse_args()
 
@@ -67,6 +68,7 @@ DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 LOGGING = True
+RUN_BASELINE = args.run_baseline
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -150,35 +152,28 @@ for _run in range(NUM_RUNS):
     run_loss = 0        #Initialize new loss for each run
     run_f1 = 0          #Initialize new F1 score for each run
 
-    # aug_bit = [0]*len(aug_dict)
-
-    # # print("Number of augmentations: ", len(aug_dict))
-    # # randomly_selected_augs = random.sample(aug_list, int(0.7*len(aug_list)))
-    # randomly_selected_augs = random.sample(list(aug_dict), int(0.7*len(aug_dict)))
-
-    # print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
-    # #print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
-
-    # for aug in randomly_selected_augs:
-    #     index = aug_dict[aug] - 1
-    #     aug_bit[index] = 1
+    if(RUN_BASELINE == 'all_augs'):
+        aug_bit = [1]*len(aug_dict)
+        _selected_augs = list(aug_dict.keys())
         
-    # print(aug_bit)
-    # all_aug_bits.append(aug_bit)
+    elif(RUN_BASELINE == 'no_augs'):
+        aug_bit = [0]*len(aug_dict)
+        _selected_augs = []
+        
+    else:
+        _selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
 
-    randomly_selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
-    print("Number of augmentations selected: {}".format(len(randomly_selected_augs)))
-    #print("Augmentations selected: {} \n".format([i for i in randomly_selected_augs]))
+    print("Number of augmentations selected: {}".format(len(_selected_augs)))
     print("Augmentation bit representation: {}".format(aug_bit))
     all_aug_bits.append(aug_bit)
 
-    # raise SystemExit(0)
-
     #Add required basic transforms here.
-    randomly_selected_augs = [Resize(224, 224)] + randomly_selected_augs
+    _selected_augs = [Resize(224, 224)] + _selected_augs
 
-    train_transform = A.Compose(randomly_selected_augs)
+    train_transform = A.Compose(_selected_augs)
     basic_transform = A.Compose([Resize(224, 224)])
+
+    #raise SystemExit(0)
 
     ##################################### DATASETS #######################################
 

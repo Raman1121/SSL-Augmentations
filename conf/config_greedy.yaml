@@ -41,6 +41,7 @@ run:
   do_finetune: False
   lr_scheduler: 'cyclic'
   encoder: 'resnet50'
+  
 
   
 
