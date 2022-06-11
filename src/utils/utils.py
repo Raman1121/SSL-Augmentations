@@ -19,6 +19,8 @@ import numpy as np
 import yaml
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pprint import pprint
+from itertools import compress
 
 
 def check_data_loader(dl):
@@ -32,7 +34,6 @@ def check_data_loader(dl):
         print("\n")
         
         break
-
 
 def CIFAR10_dataset(train_transforms, test_transforms, download_dir='../../data'):
 
@@ -309,7 +310,6 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
     else:
         print("Saving plot skipped.")
 
-
 def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dict, 
                               info_dict, save_dir='saved_plots/', save_plot=True):
 
@@ -378,6 +378,56 @@ def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot
     if(save_plot):
         plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
 
+def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, save_plot=True, save_dir='saved_plots/'):
+
+    if(save_plot):
+
+        plt.figure(figsize=(30, 15))
+
+        dataset = info_dict['dataset']
+        encoder = info_dict['encoder']
+        finetune = info_dict['finetune']
+        experiment = info_dict['experiment'] + '_intermediate_results'
+
+        val_augs = val_results_dict['aug']
+        val_aug_labels = val_results_dict['aug_label']
+        val_f1 = val_results_dict['f1']
+        val_aug_labels_list = []
+
+        for e in val_aug_labels:
+            val_aug_labels_list.append('[' + ','.join(e) + ']')
+
+        test_augs = test_results_dict['aug']
+        test_aug_labels = test_results_dict['aug_label']
+        test_f1 = test_results_dict['f1']
+        test_aug_labels_list = []
+
+        yticks = np.arange(0, 1.1, 0.1)
+
+        for e in test_aug_labels:
+            test_aug_labels_list.append('[' + ','.join(e) + ']')
+
+        #plt.rcParams['xtick.labelsize'] = 'small'
+        plt.plot(val_aug_labels_list, val_f1, marker='o', markersize=10, label='Validation F1 Score', linewidth=4)
+        plt.plot(test_aug_labels_list, test_f1, marker='o', markersize=10, label='Test F1 Score', linewidth=4)
+
+        plt.xlabel('Augmentation Subsets')
+        plt.ylabel('F1 Score')
+
+        #plt.xticks(len(val_aug_labels_list), val_aug_labels_list)
+        #plt.yticks(len(yticks), yticks)
+
+        plt.suptitle("Validation and Test F1 Score during Greedy Search for {} dataset".format(dataset))
+        plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
+
+        plt.legend()
+        plt.tight_layout()
+
+        plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+
+    else:
+        print("Saving plot skipped.")
+
 
 def gen_binomial_dict(aug_dict):
     '''
@@ -423,7 +473,12 @@ def sort_dictionary(results_dict):
 
     return sorted_dict
 
+def get_aug_from_vector(aug_dict, aug_bit_vector):
+    aug_vec_bool = [bool(a) for a in aug_bit_vector]
 
+    return list(compress(list(aug_dict.keys()), aug_vec_bool))
+
+    
 
 def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
 

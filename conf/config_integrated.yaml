@@ -40,6 +40,7 @@ run:
   do_finetune: False
   lr_scheduler: 'cyclic'
   encoder: 'resnet50'
+  aug_bit_vector: null            # [1,1,1,1,1,1,1,1,1] OR [0,0,0,0,0,0,0,0,0]
 
   
 

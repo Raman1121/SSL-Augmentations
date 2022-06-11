@@ -69,7 +69,8 @@ LOG_FOLDER = yaml_data['run']['log_folder']
 DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
-LOGGING = True
+LOGGING = False
+
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -121,13 +122,13 @@ aug_dict = {CLAHE(): 1,
 
 # Make sure to maintain the same order of augmentations here as in aug_dict dictionary
 aug_dict_labels = {'CLAHE': 1,
-                   'ColorJitter': 2,
-                   'Downscale': 3,
-                   'Emboss': 4,
-                   'ShiftScaleRotate': 5,
-                   'HorizontalFlip': 6,
-                   'VerticalFlip': 7,
-                   'ImageCompression': 8,
+                   'CJ': 2,
+                   'DS': 3,
+                   'EB': 4,
+                   'SSR': 5,
+                   'HF': 6,
+                   'VF': 7,
+                   'IC': 8,
                    'Rotate': 9
                    }
 
@@ -144,12 +145,20 @@ all_f1 = []
 all_aug_bits = []
 all_runs = []
 
-# A dictionary to store the best augmentations and results from all runs
+# A dictionary to store the best augmentations and results from all runs during the final testing stage
 test_results_dict = {'aug':[],
                      'aug_label': [],
-                     'f1':[]}
+                     'f1':[]
+                     }
+# A dictionary to store the best augmentations and results from all runs during the validation stage
+val_results_dict = {'aug':[],
+                     'aug_label': [],
+                     'f1':[]
+                     }
 
 while(len(all_aug_list) > 0):
+
+    print("Number of augmentations remaining {}".format(len(all_aug_list)))
 
     # A dictionary to store the augmentations and their corresponding results for each pass
     _aug_results = {'aug':[],
@@ -170,7 +179,7 @@ while(len(all_aug_list) > 0):
 
         print("Selecting augmentation: {}".format(_aug_label))
 
-        print("Number of augmentations remaining {}".format(len(all_aug_list)))
+        
 
         #Add required basic transforms here.
         augs_for_this_pass = [Resize(224, 224)] + all_selected_augs + [_aug]
@@ -223,6 +232,12 @@ while(len(all_aug_list) > 0):
         _aug_results['aug_label'] += [_aug_label]
         _aug_results['f1'] += [run_f1]
 
+        '''
+        val_results_dict['aug'] += [_aug]
+        val_results_dict['aug_label'] += [_aug_label]
+        val_results_dict['f1'] += [run_f1]
+        '''
+
     #Obtain the augmentation which gave the best f1 score for this pass
     sorted_dict = {}
     augmentations = _aug_results['aug']
@@ -255,6 +270,11 @@ while(len(all_aug_list) > 0):
     all_aug_list.remove(_best_augmentation)         #Remove this augmentation from the list of augmentations
     all_aug_labels_list.remove(_best_augmentation_label)
 
+    #Add these results to validation dictionary to plot intermediate results
+    val_results_dict['aug'] += [all_selected_augs[:]]
+    val_results_dict['aug_label'] += [all_selected_augs_labels[:]]
+    val_results_dict['f1'] += [sorted_dict['f1'][0]]
+    
     # Add this selection to the test results dictionary
 
     test_results_dict['aug'] += [all_selected_augs[:]]
@@ -347,12 +367,18 @@ sorted_test_results_dict['f1'] = l1
 sorted_test_results_dict['aug'] = l2
 sorted_test_results_dict['aug_label'] = l3
 
+print("############################ RESULTS FROM VALIDATION STAGE ############################")
+pprint(val_results_dict['aug_label'])
+pprint(val_results_dict['f1'])
+
+
 print("############################ FINAL TEST RESULTS AFTER SORTING ############################")
-pprint(sorted_test_results_dict)
+pprint(sorted_test_results_dict['aug_label'])
+pprint(sorted_test_results_dict['f1'])
     
 
 print("################################### BEST AUGMENTATION AFTER GREEDY SEARCH ##########################")
-pprint(sorted_test_results_dict['aug'][0])
+pprint(sorted_test_results_dict['aug_label'][0])
 
 print("################################### BEST F1 SCORE AFTER GREEDY SEARCH ##########################")
 pprint(sorted_test_results_dict['f1'][0])
@@ -373,6 +399,9 @@ aug_bit_vector = utils.plot_greedy_augmentations(aug_dict, aug_dict_labels,
                                 sorted_test_results_dict,
                                 info_dict,
                                 save_plot=SAVE_PLOTS)
+
+utils.plot_intermidiate_results(val_results_dict, test_results_dict, 
+                                info_dict, save_plot=SAVE_PLOTS)
 
 end_time = time.time()
 

@@ -69,6 +69,7 @@ ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 LOGGING = True
 RUN_BASELINE = args.run_baseline
+AUG_BIT_VECTOR = yaml_data['run']['aug_bit_vector']
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -125,17 +126,23 @@ aug_dict = {
             }
 
 
-all_acc = []
-all_loss = []
-all_f1 = []
+all_test_acc = []
+all_test_loss = []
+all_test_f1 = []
+all_val_acc = []
+all_val_loss = []
+all_val_f1 = []
 all_aug_bits = []
 all_runs = []
 
 # A dictionary to store the best results and corresponding bit representation from all runs
 all_results = {
-                'acc': [],
-                'loss': [],
-                'f1': [],
+                'test_acc': [],
+                'test_loss': [],
+                'test_f1': [],
+                'val_acc': [],
+                'val_loss': [],
+                'val_f1': [],
                 'k_bit_representation': [0]*len(aug_dict),
                 'run': []
                 }
@@ -148,17 +155,21 @@ for _run in range(NUM_RUNS):
     #Load the train set
     main_df = pd.read_csv(TRAIN_DF_PATH)
 
-    run_acc = 0         #Initialize new accuracy for each run
-    run_loss = 0        #Initialize new loss for each run
-    run_f1 = 0          #Initialize new F1 score for each run
+    test_run_acc = 0         #Initialize new accuracy for each run
+    test_run_loss = 0        #Initialize new loss for each run
+    test_run_f1 = 0          #Initialize new F1 score for each run
 
-    if(RUN_BASELINE == 'all_augs'):
-        aug_bit = [1]*len(aug_dict)
-        _selected_augs = list(aug_dict.keys())
+    if(AUG_BIT_VECTOR != None):
+        aug_bit = AUG_BIT_VECTOR
+        _selected_augs = utils.get_aug_from_vector(aug_dict, AUG_BIT_VECTOR)
+
+    # elif(RUN_BASELINE == 'all_augs'):
+    #     aug_bit = [1]*len(aug_dict)
+    #     _selected_augs = list(aug_dict.keys())
         
-    elif(RUN_BASELINE == 'no_augs'):
-        aug_bit = [0]*len(aug_dict)
-        _selected_augs = []
+    # elif(RUN_BASELINE == 'no_augs'):
+    #     aug_bit = [0]*len(aug_dict)
+    #     _selected_augs = []
         
     else:
         _selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
@@ -173,182 +184,25 @@ for _run in range(NUM_RUNS):
     train_transform = A.Compose(_selected_augs)
     basic_transform = A.Compose([Resize(224, 224)])
 
-    #raise SystemExit(0)
+    print(train_transform)
 
-    ##################################### DATASETS #######################################
+    # raise SystemExit(0)
 
-    train_dataset = None
-    test_dataset = None
-    val_dataset = None
+    ##################################### DATASETS & DATALOADERS ##########################
 
-    if(DATASET == 'retinopathy'):
+    results_dict = utils.get_dataloaders(yaml_data, DATASET, train_transform, basic_transform)
 
-        '''
-        Preparing the Diabetic Retinopathy dataset
-        '''
-
-        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
-                                             classes = np.unique(main_df['level']), 
-                                             y = main_df['level'].to_numpy())
-
-        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
-        
-        #Load the test set for DR dataset
-        TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
-        test_df = pd.read_csv(TEST_DF_PATH)
-
-        TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
-        VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
-        TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
-
-        main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
-        test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
-
-        #Checking if SUBSET size is greater than the size of the dataset itself.
-        TRAIN_SUBSET = len(main_df) if len(main_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-
-        train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                            transforms=train_transform, subset=TRAIN_SUBSET)
-
-        test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=basic_transform, subset=TEST_SUBSET)
-                                                        
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
-    elif(DATASET == 'cancer_mnist'):
-
-        '''
-        Preparing the Cancer MNIST dataset
-        '''
-
-        #NOTE: Val and Test data for this dataset has not been provided!
-
-        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
-                                             classes = np.unique(main_df['cell_type_idx']), 
-                                             y = main_df['cell_type_idx'].to_numpy())
-
-        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-
-        #Checking if SUBSET size is greater than the size of the dataset itself.
-
-        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-
-        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
-                                                                subset=TRAIN_SUBSET)
-
-        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=basic_transform, 
-                                                                subset=TEST_SUBSET)
-
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
-    elif(DATASET == 'chexpert'):
-        '''
-        Preparing the CheXpert dataset
-        '''
-        #NOTE: Test data for this dataset has not been provided!
-
-        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-        val_df = pd.read_csv(VAL_DF_PATH)
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-        
-        #Checking if SUBSET size is greater than the size of the dataset itself.
-
-        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
+    train_image_loader = results_dict['train_image_loader']
+    val_image_loader = results_dict['val_image_loader']
+    test_image_loader = results_dict['test_image_loader']
+    ACTIVATION = results_dict['activation']
+    LOSS_FN = results_dict['loss_fn']
+    MULTILABLE = results_dict['multilable']
+    CLASS_WEIGHTS = results_dict['class_weights']
     
-        train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
-                                                        subset=TRAIN_SUBSET)
-
-        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=basic_transform,
-                                                        subset=VAL_SUBSET)
-
-        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=basic_transform, 
-                                                        subset=TEST_SUBSET)
-                                                
-
-        ACTIVATION = 'sigmoid'
-        LOSS_FN = 'bce'
-        MULTILABLE = True
-        CLASS_WEIGHTS = None
-
-    elif(DATASET == 'mura'):
-        '''
-        Preparing the MURA dataset
-        '''
-
-        #NOTE: Test data for this dataset has not been provided!
-
-        CLASS_WEIGHTS = compute_class_weight(class_weight = 'balanced', 
-                                             classes = np.unique(main_df['label']), 
-                                             y = main_df['label'].to_numpy())
-
-        CLASS_WEIGHTS = torch.Tensor(CLASS_WEIGHTS)
-
-        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-        val_df = pd.read_csv(VAL_DF_PATH)
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-
-        #Checking if SUBSET size is greater than the size of the dataset itself.
-
-        TRAIN_SUBSET = len(train_df) if len(train_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        VAL_SUBSET = len(val_df) if len(val_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-        TEST_SUBSET = len(test_df) if len(test_df) < int(0 if SUBSET == None else SUBSET) else SUBSET
-
-        train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
-                                                                subset=TRAIN_SUBSET)
-
-        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=basic_transform,
-                                                                subset=VAL_SUBSET)
-
-        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=basic_transform, 
-                                                                subset=TEST_SUBSET)
-
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
     ######################################################################################
 
 
-    #Creating Data Loaders
-    if(train_dataset != None):
-        print("Train dataset length: ", len(train_dataset))
-        train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
-
-    if(val_dataset != None):
-        print("Val dataset length: ", len(val_dataset))
-        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-
-    if(test_dataset != None):
-        print("Test dataset length: ", len(test_dataset))
-        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-
-    
     model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                             class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                             do_finetune=DO_FINETUNE, 
@@ -364,85 +218,83 @@ for _run in range(NUM_RUNS):
         print("New suggested learning rate is: ", new_lr)
         model.hparams.learning_rate = new_lr
 
-    if(val_dataset == None):
+    # if(val_dataset == None):
 
-        print("Validation dataset not provided for {} dataset".format(DATASET))
-        #Providing data loader for only the train set in the fit method.
-        trainer.fit(model, train_image_loader)
+    #     print("Validation dataset not provided for {} dataset".format(DATASET))
+    #     #Providing data loader for only the train set in the fit method.
+    #     trainer.fit(model, train_image_loader)
 
-    elif(val_dataset != None):
+    # elif(val_dataset != None):
 
-        #Providing data loader for both the train and val set in the fit method.
-        trainer.fit(model, train_image_loader, val_image_loader)
+    #     #Providing data loader for both the train and val set in the fit method.
+    #     trainer.fit(model, train_image_loader, val_image_loader)
 
-    if(test_dataset != None):
-        test_results = trainer.test(dataloaders=test_image_loader)
-        
-        run_acc = test_results[0]['test_acc']
-        run_loss = test_results[0]['test_loss']
-        run_f1 = test_results[0]['f1_score']
+    #In this case, we have train, validation, and test dataloaders for all datasets
+    print("################ Initiating training process ####################")
+    trainer.fit(model, train_image_loader)
 
-        # try:
+    print("################ Initiating validation process ##################")
+    val_results = trainer.validate(dataloaders=val_image_loader)
 
-        #     if(run_acc > best_results['best_acc'][0]):
-        #         best_results['run'] = [_run+1]
-        #         best_results['best_acc'] = [run_acc]
-        #         best_results['k_bit_representation'] = [aug_bit]
+    val_run_acc = val_results[0]['val_acc']
+    val_run_loss = val_results[0]['val_loss']
+    val_run_f1 = val_results[0]['f1_score']
 
-        #     elif(run_acc == best_results['best_acc']):
-        #         _best_runs = best_results['run']
-        #         _best_runs.append(_run)
+    print("################ Initiating testing process #####################")
+    test_results = trainer.test(dataloaders=test_image_loader)
+    
+    test_run_acc = test_results[0]['test_acc']
+    test_run_loss = test_results[0]['test_loss']
+    test_run_f1 = test_results[0]['f1_score']
 
-        #         _best_acc = best_results['best_acc']
-        #         _best_acc.append(run_acc)
+    all_test_acc.append(test_run_acc)
+    all_test_loss.append(test_run_loss)
+    all_test_f1.append(test_run_f1)
 
-        #         _best_k_bits = best_results['k_bit_representation']
-        #         _best_k_bits.append(aug_bit)
+    all_val_acc.append(val_run_acc)
+    all_val_loss.append(val_run_loss)
+    all_val_f1.append(val_run_f1)
+    #print(test_results)
 
-        #         best_results['run'] = _best_runs
-        #         best_results['best_acc'] = _best_acc
-        #         best_results['k_bit_representation'] = _best_k_bits
-        
-        # except:
-        #     print("Error while obtaining best results from all runs.")
+    #Saving results from all the runs
+    all_results['test_acc'] = all_test_acc
+    all_results['test_loss'] = all_test_loss
+    all_results['test_f1'] = all_test_f1
+    all_results['val_acc'] = all_val_acc
+    all_results['val_loss'] = all_val_loss
+    all_results['val_f1'] = all_val_f1
+    all_results['k_bit_representation'] = all_aug_bits
+    all_results['run'] = all_runs
 
-        all_acc.append(run_acc)
-        all_loss.append(run_loss)
-        all_f1.append(run_f1)
-        #print(test_results)
+    print("Validation Accuracy for run {} is: {}".format(_run+1, val_run_acc))
+    print("Validation Loss for run {} is: {}".format(_run+1, val_run_loss))
+    print("Validation F1 Score for run {} is: {}".format(_run+1, val_run_f1))
 
-        #Saving results from all the runs
-        all_results['acc'] = all_acc
-        all_results['loss'] = all_loss
-        all_results['f1'] = all_f1
-        all_results['k_bit_representation'] = all_aug_bits
-        all_results['run'] = all_runs
+    print("Test Accuracy for run {} is: {}".format(_run+1, test_run_acc))
+    print("Test Loss for run {} is: {}".format(_run+1, test_run_loss))
+    print("Test F1 Score for run {} is: {}".format(_run+1, test_run_f1))
 
-        print("Test Accuracy for run {} is: {}".format(_run+1, run_acc))
-        print("Test Loss for run {} is: {}".format(_run+1, run_loss))
-        print("F1 Score for run {} is: {}".format(_run+1, run_f1))
-        print("#######################################################")
-        print('\n')
-
-
-
-    else:
-        print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
+    print("#######################################################")
+    print('\n')
 
 if(NUM_RUNS > 1):
-    mean_test_acc = sum(all_acc)/len(all_acc)
-    mean_test_loss = sum(all_loss)/len(all_loss)
-    mean_test_f1 = sum(all_f1)/len(all_f1)
+    mean_test_acc = sum(all_test_acc)/len(all_test_acc)
+    mean_test_loss = sum(all_test_loss)/len(all_test_loss)
+    mean_test_f1 = sum(all_test_f1)/len(all_test_f1)
+
+    mean_val_acc = sum(all_val_acc)/len(all_val_acc)
+    mean_val_loss = sum(all_val_loss)/len(all_val_loss)
+    mean_val_f1 = sum(all_val_f1)/len(all_val_f1)
 
     print("Average Augmentation Bit Representation: ", [sum(i) for i in zip(*all_aug_bits)])
-    print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_acc])
-    print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_loss])
-    print("Deviation from mean F1 in each run: ", [x - mean_test_f1 for x in all_f1])
+    print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_test_acc])
+    print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_test_loss])
+    print("Deviation from mean F1 in each run: ", [x - mean_test_f1 for x in all_test_f1])
     print("\n")
 
-    print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
-    print("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
-    print("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
+    print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
+    print("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
+    print("Standard Deviation for F1 score across all runs: {}".format(np.std(all_test_f1)))
     print("\n")
 
     
@@ -454,7 +306,7 @@ if(NUM_RUNS > 1):
                  'finetune': DO_FINETUNE,
                  'experiment': EXPERIMENT}
 
-    utils.plot_run_stats(all_acc, all_loss, 
+    utils.plot_run_stats(all_test_acc, all_test_loss, 
                         info_dict=info_dict,
                         save_dir='saved_plots/', 
                         save_plot=SAVE_PLOTS)
@@ -466,17 +318,17 @@ if(NUM_RUNS > 1):
         f.write("\n")
         f.write("Average Augmentation Bit Representation: {}".format([sum(i) for i in zip(*all_aug_bits)]))
         f.write("\n")
-        f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_acc]))
+        f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_test_acc]))
         f.write("\n")
-        f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_loss]))
+        f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_test_loss]))
         f.write("\n")
-        f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_f1]))
+        f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_test_f1]))
         f.write("\n")
-        f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_acc)))
+        f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
         f.write("\n")
-        f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_loss)))
+        f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
         f.write("\n")
-        f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_f1)))
+        f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_test_f1)))
         f.write("\n")
         f.write("\n")
         f.write("\n")
