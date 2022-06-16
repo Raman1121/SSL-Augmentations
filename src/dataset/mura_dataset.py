@@ -68,6 +68,7 @@ class MuraDataset(Dataset):
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
                 image = read_image(self.df['path'][idx], mode=ImageReadMode.RGB)
                 image = self.transforms(image)
+                image = image.float()
 
             #Check if albumentation transforms are provided
             elif(type(self.transforms) == A.core.composition.Compose):

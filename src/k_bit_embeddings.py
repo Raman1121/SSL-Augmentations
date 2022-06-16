@@ -21,6 +21,7 @@ import albumentations as A
 from albumentations.augmentations.transforms import *
 from albumentations.augmentations.crops.transforms import *
 from albumentations.augmentations.geometric.rotate import *
+from albumentations.augmentations.geometric.transforms import *
 from albumentations.augmentations.geometric.resize import Resize
 
 from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
@@ -36,7 +37,8 @@ parser = argparse.ArgumentParser(description='Hyper-parameters management')
 parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 parser.add_argument('--num_runs', type=int, default=1, help='Number of runs for a dataset. Different augmentations will be randomly samples in each run.')
-parser.add_argument('--run_baseline', type=str, default=None, help='Run baseline experiments with all or no augmentations')
+parser.add_argument('--train_mlp', type=bool, default=False, help='Train an MLP instead of a single layer')
+parser.add_argument('--imagenet_policy', type=bool, default=False, help='Use ImageNet policy given by AutoAugment for augmentation.')
 
 args = parser.parse_args()
 
@@ -68,8 +70,9 @@ DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 LOGGING = True
-RUN_BASELINE = args.run_baseline
 AUG_BIT_VECTOR = yaml_data['run']['aug_bit_vector']
+TRAIN_MLP = args.train_mlp
+IMAGENET_POLICY = args.imagenet_policy
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -87,11 +90,13 @@ if(EXPERIMENTAL_RUN):
     AUTO_LR_FIND = False
     LOGGING = False
 
+pprint(yaml_data)
+
 if(LOGGING):
 
     #Save results to a text file
     filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + str(NUM_RUNS) + '.txt'
-    f = open(os.path.join(LOG_FOLDER, filename), "a")
+    f = open(os.path.join(LOG_FOLDER, filename), "w")
     f.write("EXPERIMENT DATE: {}".format(date.today()))
     f.write("\n")
 
@@ -102,27 +107,22 @@ if(LOGGING):
     print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
 
-
-# logging.basicConfig(filename=EXPERIMENT+'_'+DATASET+'.log')
-# logging.info("YAML DATA: f'{yaml_data}")
-
-#transform_prob = 1
-#crop_height = int(0.7*224) #Assuming all images would be 224x224
-#crop_width = int(0.7*224)  #Assuming all images would be 224x224
-
 crop_height = 224
 crop_width = 224
 
+#All these transformations are defined in Albumentations
 aug_dict = {
             CLAHE(): 1,
             ColorJitter(): 2,
             Downscale(): 3,
             Emboss(): 4,
-            Flip(): 5,
+            ShiftScaleRotate(): 5,
             HorizontalFlip(): 6,
             VerticalFlip(): 7,
             ImageCompression(): 8,
-            Rotate(): 9
+            Rotate(): 9,
+            Normalize(): 10,
+            Perspective(): 11
             }
 
 
@@ -159,34 +159,49 @@ for _run in range(NUM_RUNS):
     test_run_loss = 0        #Initialize new loss for each run
     test_run_f1 = 0          #Initialize new F1 score for each run
 
-    if(AUG_BIT_VECTOR != None):
-        aug_bit = AUG_BIT_VECTOR
-        _selected_augs = utils.get_aug_from_vector(aug_dict, AUG_BIT_VECTOR)
+    if(IMAGENET_POLICY):
 
-    # elif(RUN_BASELINE == 'all_augs'):
-    #     aug_bit = [1]*len(aug_dict)
-    #     _selected_augs = list(aug_dict.keys())
-        
-    # elif(RUN_BASELINE == 'no_augs'):
-    #     aug_bit = [0]*len(aug_dict)
-    #     _selected_augs = []
-        
+        assert AUG_BIT_VECTOR == None
+
+        EXPERIMENT = 'autoaugment_imagenet_policy_'
+        policy = T.AutoAugmentPolicy.IMAGENET
+        train_transform = T.Compose([T.Resize([224, 224]), T.AutoAugment(policy)])
+        basic_transform = T.Compose([T.Resize([224, 224])])
+
     else:
-        _selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
 
-    print("Number of augmentations selected: {}".format(len(_selected_augs)))
-    print("Augmentation bit representation: {}".format(aug_bit))
-    all_aug_bits.append(aug_bit)
+        assert IMAGENET_POLICY == False
 
-    #Add required basic transforms here.
-    _selected_augs = [Resize(224, 224)] + _selected_augs
+        if(AUG_BIT_VECTOR != None):
 
-    train_transform = A.Compose(_selected_augs)
-    basic_transform = A.Compose([Resize(224, 224)])
+            assert len(AUG_BIT_VECTOR) == len(aug_dict)
 
-    print(train_transform)
+            aug_bit = AUG_BIT_VECTOR
+            _selected_augs = utils.get_aug_from_vector(aug_dict, AUG_BIT_VECTOR)
 
-    # raise SystemExit(0)
+            if(np.sum(AUG_BIT_VECTOR) == len(aug_dict)):
+                EXPERIMENT = 'bernoulli_k_bit_baseline_all_augs'
+            elif(np.sum(AUG_BIT_VECTOR) == 0):
+                EXPERIMENT = 'bernoulli_k_bit_baseline_no_augs'
+            
+        else:
+            _selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
+
+        if(TRAIN_MLP):
+            EXPERIMENT = EXPERIMENT + '_mlp_'
+
+            
+
+        print("Number of augmentations selected: {}".format(len(_selected_augs)))
+        print("Augmentation bit representation: {}".format(aug_bit))
+        all_aug_bits.append(aug_bit)
+
+        #Add required basic transforms here.
+        _selected_augs = [Resize(224, 224)] + _selected_augs
+
+        train_transform = A.Compose(_selected_augs)
+        basic_transform = A.Compose([Resize(224, 224)])
+
 
     ##################################### DATASETS & DATALOADERS ##########################
 
@@ -199,13 +214,15 @@ for _run in range(NUM_RUNS):
     LOSS_FN = results_dict['loss_fn']
     MULTILABLE = results_dict['multilable']
     CLASS_WEIGHTS = results_dict['class_weights']
+
+    #raise SystemExit(0)
     
     ######################################################################################
 
 
     model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                             class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
-                                            do_finetune=DO_FINETUNE, 
+                                            do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                             activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 
     trainer = pl.Trainer(gpus=GPUs, 
@@ -218,27 +235,17 @@ for _run in range(NUM_RUNS):
         print("New suggested learning rate is: ", new_lr)
         model.hparams.learning_rate = new_lr
 
-    # if(val_dataset == None):
-
-    #     print("Validation dataset not provided for {} dataset".format(DATASET))
-    #     #Providing data loader for only the train set in the fit method.
-    #     trainer.fit(model, train_image_loader)
-
-    # elif(val_dataset != None):
-
-    #     #Providing data loader for both the train and val set in the fit method.
-    #     trainer.fit(model, train_image_loader, val_image_loader)
-
     #In this case, we have train, validation, and test dataloaders for all datasets
     print("################ Initiating training process ####################")
-    trainer.fit(model, train_image_loader)
+    #trainer.fit(model, train_image_loader)
+    trainer.fit(model, train_image_loader, val_image_loader)
 
-    print("################ Initiating validation process ##################")
-    val_results = trainer.validate(dataloaders=val_image_loader)
+    #print("################ Initiating validation process ##################")
+    # val_results = trainer.validate(dataloaders=val_image_loader)
 
-    val_run_acc = val_results[0]['val_acc']
-    val_run_loss = val_results[0]['val_loss']
-    val_run_f1 = val_results[0]['f1_score']
+    # val_run_acc = val_results[0]['val_acc']
+    # val_run_loss = val_results[0]['val_loss']
+    # val_run_f1 = val_results[0]['f1_score']
 
     print("################ Initiating testing process #####################")
     test_results = trainer.test(dataloaders=test_image_loader)
@@ -251,24 +258,24 @@ for _run in range(NUM_RUNS):
     all_test_loss.append(test_run_loss)
     all_test_f1.append(test_run_f1)
 
-    all_val_acc.append(val_run_acc)
-    all_val_loss.append(val_run_loss)
-    all_val_f1.append(val_run_f1)
+    # all_val_acc.append(val_run_acc)
+    # all_val_loss.append(val_run_loss)
+    # all_val_f1.append(val_run_f1)
     #print(test_results)
 
     #Saving results from all the runs
     all_results['test_acc'] = all_test_acc
     all_results['test_loss'] = all_test_loss
     all_results['test_f1'] = all_test_f1
-    all_results['val_acc'] = all_val_acc
-    all_results['val_loss'] = all_val_loss
-    all_results['val_f1'] = all_val_f1
+    # all_results['val_acc'] = all_val_acc
+    # all_results['val_loss'] = all_val_loss
+    # all_results['val_f1'] = all_val_f1
     all_results['k_bit_representation'] = all_aug_bits
     all_results['run'] = all_runs
 
-    print("Validation Accuracy for run {} is: {}".format(_run+1, val_run_acc))
-    print("Validation Loss for run {} is: {}".format(_run+1, val_run_loss))
-    print("Validation F1 Score for run {} is: {}".format(_run+1, val_run_f1))
+    # print("Validation Accuracy for run {} is: {}".format(_run+1, val_run_acc))
+    # print("Validation Loss for run {} is: {}".format(_run+1, val_run_loss))
+    # print("Validation F1 Score for run {} is: {}".format(_run+1, val_run_f1))
 
     print("Test Accuracy for run {} is: {}".format(_run+1, test_run_acc))
     print("Test Loss for run {} is: {}".format(_run+1, test_run_loss))
@@ -282,20 +289,33 @@ if(NUM_RUNS > 1):
     mean_test_loss = sum(all_test_loss)/len(all_test_loss)
     mean_test_f1 = sum(all_test_f1)/len(all_test_f1)
 
-    mean_val_acc = sum(all_val_acc)/len(all_val_acc)
-    mean_val_loss = sum(all_val_loss)/len(all_val_loss)
-    mean_val_f1 = sum(all_val_f1)/len(all_val_f1)
+    # mean_val_acc = sum(all_val_acc)/len(all_val_acc)
+    # mean_val_loss = sum(all_val_loss)/len(all_val_loss)
+    # mean_val_f1 = sum(all_val_f1)/len(all_val_f1)
+
+    # Standard Deviation in Test and Validation metrics
 
     print("Average Augmentation Bit Representation: ", [sum(i) for i in zip(*all_aug_bits)])
-    print("Deviation from mean accuracy in each run: ", [x - mean_test_acc for x in all_test_acc])
-    print("Deviation from mean loss in each run: ", [x - mean_test_loss for x in all_test_loss])
-    print("Deviation from mean F1 in each run: ", [x - mean_test_f1 for x in all_test_f1])
+    print("Deviation from mean test accuracy in each run: ", [x - mean_test_acc for x in all_test_acc])
+    print("Deviation from mean test loss in each run: ", [x - mean_test_loss for x in all_test_loss])
+    print("Deviation from mean test F1 in each run: ", [x - mean_test_f1 for x in all_test_f1])
     print("\n")
 
-    print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
-    print("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
-    print("Standard Deviation for F1 score across all runs: {}".format(np.std(all_test_f1)))
-    print("\n")
+    # print("Deviation from mean validation accuracy in each run: ", [x - mean_val_acc for x in all_val_acc])
+    # print("Deviation from mean validation loss in each run: ", [x - mean_val_loss for x in all_val_loss])
+    # print("Deviation from mean validation F1 in each run: ", [x - mean_val_f1 for x in all_val_f1])
+    # print("\n")
+
+    # # Standard Deviation in Test and Validation metrics
+    # print("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
+    # print("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
+    # print("Standard Deviation for test F1 score across all runs: {}".format(np.std(all_test_f1)))
+    # print("\n")
+
+    # print("Standard Deviation for validation accuracy across all runs: {}".format(np.std(all_val_acc)))
+    # print("Standard Deviation for validation loss across all runs: {}".format(np.std(all_val_loss)))
+    # print("Standard Deviation for validation F1 score across all runs: {}".format(np.std(all_val_f1)))
+    # print("\n")
 
     
     print("\n")
@@ -306,10 +326,10 @@ if(NUM_RUNS > 1):
                  'finetune': DO_FINETUNE,
                  'experiment': EXPERIMENT}
 
-    utils.plot_run_stats(all_test_acc, all_test_loss, 
-                        info_dict=info_dict,
-                        save_dir='saved_plots/', 
-                        save_plot=SAVE_PLOTS)
+    # utils.plot_run_stats(all_val_f1, all_test_f1, 
+    #                     info_dict=info_dict,
+    #                     save_dir='saved_plots/', 
+    #                     save_plot=SAVE_PLOTS)
 
     
     #f.write("\n")
@@ -318,20 +338,20 @@ if(NUM_RUNS > 1):
         f.write("\n")
         f.write("Average Augmentation Bit Representation: {}".format([sum(i) for i in zip(*all_aug_bits)]))
         f.write("\n")
-        f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_test_acc]))
-        f.write("\n")
-        f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_test_loss]))
-        f.write("\n")
-        f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_test_f1]))
-        f.write("\n")
-        f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
-        f.write("\n")
-        f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
-        f.write("\n")
-        f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_test_f1)))
-        f.write("\n")
-        f.write("\n")
-        f.write("\n")
+        # f.write("Deviation from mean accuracy in each run: {}".format([x - mean_test_acc for x in all_test_acc]))
+        # f.write("\n")
+        # f.write("Deviation from mean loss in each run: {}".format([x - mean_test_loss for x in all_test_loss]))
+        # f.write("\n")
+        # f.write("Deviation from mean F1 in each run:{} ".format([x - mean_test_f1 for x in all_test_f1]))
+        # f.write("\n")
+        # f.write("Standard Deviation for test accuracy across all runs: {}".format(np.std(all_test_acc)))
+        # f.write("\n")
+        # f.write("Standard Deviation for test loss across all runs: {}".format(np.std(all_test_loss)))
+        # f.write("\n")
+        # f.write("Standard Deviation for F1 score across all runs: {}".format(np.std(all_test_f1)))
+        # f.write("\n")
+        # f.write("\n")
+        # f.write("\n")
 
         f.write(" ############# ALL RESULTS ############### \n")
         #print the all_results dictionary here after sorting

@@ -37,6 +37,7 @@ from pprint import pprint
 parser = argparse.ArgumentParser(description='Hyper-parameters management')
 parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
+parser.add_argument('--train_mlp', type=bool, default=False, help='Train an MLP instead of a single layer')
 
 args = parser.parse_args()
 
@@ -69,8 +70,8 @@ LOG_FOLDER = yaml_data['run']['log_folder']
 DO_FINETUNE = yaml_data['run']['do_finetune']
 ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
-LOGGING = False
-
+LOGGING = True
+TRAIN_MLP = args.train_mlp
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -103,13 +104,14 @@ if(LOGGING):
     print("SUBSET: {}".format(SUBSET), f)
     print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
+if(TRAIN_MLP):
+    EXPERIMENT = EXPERIMENT + '_mlp_'
 
-
-#transform_prob = 1
 crop_height = 224
 crop_width = 224
 
-aug_dict = {CLAHE(): 1,
+aug_dict = {
+            CLAHE(): 1,
             ColorJitter(): 2,
             Downscale(): 3,
             Emboss(): 4,
@@ -117,11 +119,16 @@ aug_dict = {CLAHE(): 1,
             HorizontalFlip(): 6,
             VerticalFlip(): 7,
             ImageCompression(): 8,
-            Rotate(): 9
+            Rotate(): 9,
+            Normalize(): 10,
+            Perspective(): 11
             }
 
+
+
 # Make sure to maintain the same order of augmentations here as in aug_dict dictionary
-aug_dict_labels = {'CLAHE': 1,
+aug_dict_labels = {
+                   'CLAHE': 1,
                    'CJ': 2,
                    'DS': 3,
                    'EB': 4,
@@ -129,7 +136,9 @@ aug_dict_labels = {'CLAHE': 1,
                    'HF': 6,
                    'VF': 7,
                    'IC': 8,
-                   'Rotate': 9
+                   'Rotate': 9,
+                   'INet_Norm':10,
+                   'Perspective':11
                    }
 
 
@@ -204,7 +213,7 @@ while(len(all_aug_list) > 0):
 
         model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
-                                                do_finetune=DO_FINETUNE, 
+                                                do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
 
         trainer = pl.Trainer(gpus=GPUs, 

@@ -2,7 +2,7 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
 
-from pl_bolts.models.self_supervised import SimCLR
+#from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 from pl_bolts.datasets import DummyDataset
 from dataset import retinopathy_dataset
@@ -273,7 +273,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
     
     return return_dict
 
-def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_plot=True):
+def plot_run_stats(all_val_f1, all_test_f1, info_dict, save_dir='saved_plots/', save_plot=True):
     if(save_plot):
 
         num_runs = info_dict['num_runs']
@@ -284,15 +284,15 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
 
         runs = list(range(num_runs))
 
-        plt.plot(runs, all_acc, label='Test Accuracy', linewidth=4)
-        plt.plot(runs, all_loss, label='Test Loss', linewidth=4)
-        plt.plot(runs, [np.mean(all_acc)]*len(all_acc), label='Mean Acc', linewidth=2, linestyle='dashed')
+        plt.plot(runs, all_val_f1, label='Validation F1 Score', linewidth=4)
+        plt.plot(runs, all_test_f1, label='Test F1 Score', linewidth=4)
+        #plt.plot(runs, [np.mean(all_test_f1)]*len(all_test_f1), label='Mean Test F1 Score', linewidth=2, linestyle='dashed')
 
         plt.xticks(np.arange(num_runs), runs)
         plt.xlabel('Runs')
         plt.ylabel('Value')
 
-        plt.suptitle("Test Accuracy and Loss across different runs for {} dataset".format(dataset))
+        plt.suptitle("Test and Validation F1 Score across different runs for {} dataset".format(dataset))
         plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
         #title = ' '.join(str(i) for i in aug_bit)
         #title = '['+title+']'
@@ -300,7 +300,7 @@ def plot_run_stats(all_acc, all_loss, info_dict, save_dir='saved_plots/', save_p
         #plt.title(prefix)
 
         plt.legend()
-        
+        plt.tight_layout()
 
         #save_path = os.path.join(save_dir, dataset+'.png')
 
@@ -456,18 +456,19 @@ def gen_binomial_dict(aug_dict):
 
 def sort_dictionary(results_dict):
     
-    all_acc = results_dict['acc']
-    all_loss = results_dict['loss']
-    all_f1 = results_dict['f1']
+    all_acc = results_dict['test_acc']
+    all_loss = results_dict['test_loss']
+    all_f1 = results_dict['test_f1']
     all_repr = results_dict['k_bit_representation']
     all_runs = results_dict['run']
 
-    l1, l2, l3, l4, l5 = (list(t) for t in zip(*sorted(zip(all_acc, all_loss, all_f1, all_repr, all_runs), reverse=True)))
+    #l1, l2, l3, l4, l5 = (list(t) for t in zip(*sorted(zip(all_acc, all_loss, all_f1, all_repr, all_runs), reverse=True)))
+    l1, l2, l3, l4, l5 = (list(t) for t in zip(*sorted(zip(all_f1, all_loss, all_acc, all_repr, all_runs), reverse=True)))
 
     sorted_dict = {}
-    sorted_dict['acc'] = l1
-    sorted_dict['loss'] = l2
-    sorted_dict['f1'] = l3
+    sorted_dict['test_f1'] = l1
+    sorted_dict['test_loss'] = l2
+    sorted_dict['test_acc'] = l3
     sorted_dict['k_bit_representation'] = l4
     sorted_dict['run'] = l5
 

@@ -1,9 +1,9 @@
 import torch
 from torch import nn
 
-import timm
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
+# import timm
+# from timm.data import resolve_data_config
+# from timm.data.transforms_factory import create_transform
 
 from torch.optim.lr_scheduler import CyclicLR, CosineAnnealingLR, ReduceLROnPlateau
 from torch.optim import Adam
@@ -12,13 +12,13 @@ from torch.nn.functional import cross_entropy
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import torchvision.models as models
-from pl_bolts.models.self_supervised import SimCLR
+#from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 
 
 class SupervisedModel(LightningModule):
     def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50_supervised', lr_rate=0.001, 
-                lr_scheduler='none', do_finetune=True, activation='softmax', criterion='cross_entropy', 
+                lr_scheduler='none', do_finetune=True, train_mlp=False, activation='softmax', criterion='cross_entropy', 
                 multilable=False):
 
         super().__init__()
@@ -47,21 +47,46 @@ class SupervisedModel(LightningModule):
             num_filters = backbone.fc.in_features
             layers = list(backbone.children())[:-1]
             self.feature_extractor = nn.Sequential(*layers)
-            self.classifier = nn.Linear(num_filters, self.num_classes)
-            
+
+            if(train_mlp):
+                self.classifier = nn.Sequential(nn.Linear(num_filters, 512),
+                                                 nn.ReLU(),
+                                                 nn.Linear(512, 128),
+                                                 nn.ReLU(),
+                                                 nn.Linear(128, self.num_classes))
+            else:
+                self.classifier = nn.Linear(num_filters, self.num_classes)            
 
         elif(self.encoder == 'vit_patch16'):
             self.feature_extractor = timm.create_model('vit_base_patch16_224_in21k', pretrained=True, num_classes=0)
             config = resolve_data_config({}, model=self.feature_extractor)
             transform = create_transform(**config)
-            self.classifier = nn.Linear(768, self.num_classes)
+
+            if(train_mlp):
+                self.classifier = nn.Sequential(nn.Linear(768, 256),
+                                                 nn.ReLU(),
+                                                 nn.Linear(256, 128),
+                                                 nn.ReLU(),
+                                                 nn.Linear(128, self.num_classes))
+            else:
+                self.classifier = nn.Linear(768, self.num_classes)
+            
+            
 
         elif(self.encoder == 'simclr'):
             weight_path = 'https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt'
             simclr = SimCLR.load_from_checkpoint(weight_path, strict=False)
             self.feature_extractor = simclr.encoder
-            self.classifier = nn.Linear(2048, self.num_classes)
-        
+
+            if(train_mlp):
+                self.classifier = nn.Sequential(nn.Linear(2048, 512),
+                                                 nn.ReLU(),
+                                                 nn.Linear(512, 128),
+                                                 nn.ReLU(),
+                                                 nn.Linear(128, self.num_classes))
+            else:
+                self.classifier = nn.Linear(2048, self.num_classes)
+
 
         #Check for finetuning
         if(do_finetune):
@@ -108,7 +133,7 @@ class SupervisedModel(LightningModule):
 
         else:
             _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
-            print(_arr, _counts/_counts.sum()*100)
+            #print(_arr, _counts/_counts.sum()*100)
             #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
             acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
             

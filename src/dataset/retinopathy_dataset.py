@@ -69,6 +69,7 @@ class RetinopathyDataset(Dataset):
             #Check if torchvision transforms are provided
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
                 image = self.transforms(image)
+                image = image.float()   
 
             #Check if albumentation transforms are provided
             elif(type(self.transforms) == A.core.composition.Compose):
