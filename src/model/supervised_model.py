@@ -12,7 +12,7 @@ from torch.nn.functional import cross_entropy
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import torchvision.models as models
-#from pl_bolts.models.self_supervised import SimCLR
+from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 
 

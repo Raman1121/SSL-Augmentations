@@ -28,6 +28,7 @@ class ChexpertDataset(Dataset):
         self.subset = subset
         self.image_paths = []
         self.image_labels = []
+        
 
         if(self.subset != None):
             print("Creating a subset of {} samples".format(self.subset))

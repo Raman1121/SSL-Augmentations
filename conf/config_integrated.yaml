@@ -31,8 +31,8 @@ all_datasets:
 run:
   batch_size: 256
   lr_rate: 0.0003
-  epochs: 30
-  subset: 1000
+  epochs: 40
+  subset: null
   auto_lr_find: True
   save_plots: True
   experiment: 'bernoulli_k_bit'
@@ -40,7 +40,7 @@ run:
   do_finetune: False
   lr_scheduler: 'cyclic'
   encoder: 'resnet50'
-  aug_bit_vector: [1,1,1,1,1,1,1,1,1,1,1]            # [1,1,1,1,1,1,1,1,1,1,1] OR [0,0,0,0,0,0,0,0,0,0,0]
+  aug_bit_vector: [0,0,0,0,0,0,0,0,0,0,0]            # [1,1,1,1,1,1,1,1,1,1,1] OR [0,0,0,0,0,0,0,0,0,0,0]
 
   
 

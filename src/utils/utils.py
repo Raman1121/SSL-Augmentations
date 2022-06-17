@@ -57,7 +57,7 @@ def get_dummy_dataset(input_shape=(3, 224, 224), label_shape=(1,), num_samples=1
 
     return dummy_ds
 
-def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
+def get_dataloaders(yaml_data, DATASET, train_transform=None, basic_transform=None):
 
     #Dataset constants
     DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -175,6 +175,8 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
         '''
         #NOTE: Test data for this dataset has not been provided!
 
+        main_df = pd.read_csv(TRAIN_DF_PATH)
+        
         VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
         val_df = pd.read_csv(VAL_DF_PATH)
 
@@ -184,6 +186,7 @@ def get_dataloaders(yaml_data, DATASET, train_transform, basic_transform):
 
         train_df = train_df.reset_index(drop=True)
         test_df = test_df.reset_index(drop=True)
+
         
         #Checking if SUBSET size is greater than the size of the dataset itself.
 

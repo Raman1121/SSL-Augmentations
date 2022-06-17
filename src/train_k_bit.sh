@@ -6,4 +6,4 @@
 #SBATCH --account BMAI-CDT-SL2-GPU
 #SBATCH --time=30:00:00
 
-python k_bit_embeddings.py --dataset retinopathy
+python k_bit_embeddings.py --dataset cancer_mnist
