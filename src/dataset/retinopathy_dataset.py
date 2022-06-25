@@ -69,12 +69,15 @@ class RetinopathyDataset(Dataset):
             #Check if torchvision transforms are provided
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
                 image = self.transforms(image)
-                image = image.float()   
+                #image = image.float()   
 
             #Check if albumentation transforms are provided
             elif(type(self.transforms) == A.core.composition.Compose):
                 pillow_image = Image.open(self.df['image'][idx])
                 image = np.array(pillow_image)
+
+                #Convert to uint8 type
+                image = image.astype(np.uint8)
 
                 #image = image.cpu().detach().numpy()            #Albumentation takes image as a numpy array.
                 image = self.transforms(image=image)['image']
@@ -82,9 +85,8 @@ class RetinopathyDataset(Dataset):
                 image = torch.from_numpy(image)
                 image = image.permute(2, 0, 1)
 
-                #image = image.type(torch.FloatTensor)
-                image = image.float()
-                #print(image.dtype)
+            image = image.float()
+                
 
         return image, label
 

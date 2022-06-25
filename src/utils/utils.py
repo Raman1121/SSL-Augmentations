@@ -325,15 +325,17 @@ def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dic
     best_aug_labels = sorted_test_results_dict['aug_label'][0]
 
     include_vector = [0]*len(aug_dict)
+    list_aug_dict_labels = list(aug_dict_labels.keys())
 
-    for aug in list(aug_dict_labels.keys()):
+    for aug in list_aug_dict_labels:
         if(aug in best_aug_labels):
-            index = aug_dict_labels[aug] - 1
-            include_vector[index] = 1
+            #index = aug_dict_labels[aug] - 1
+            _index = list_aug_dict_labels.index(aug)
+            include_vector[_index] = 1
 
     plt.figure(figsize=(16, 16))
 
-    plot = plt.bar(list(aug_dict_labels.keys()), include_vector, width=0.8)
+    plot = plt.bar(list_aug_dict_labels, include_vector, width=0.8)
     plt.xlabel('Augmentations')
     plt.ylabel('Selected')
     plt.yticks(np.arange(0, 2, step=1))
@@ -477,10 +479,11 @@ def sort_dictionary(results_dict):
 
     return sorted_dict
 
-def get_aug_from_vector(aug_dict, aug_bit_vector):
+def get_aug_from_vector(aug_dict_labels, aug_bit_vector):
+    
     aug_vec_bool = [bool(a) for a in aug_bit_vector]
 
-    return list(compress(list(aug_dict.keys()), aug_vec_bool))
+    return list(compress(list(aug_dict_labels.values()), aug_vec_bool)), list(compress(list(aug_dict_labels.keys()), aug_vec_bool))
 
     
 
@@ -560,7 +563,4 @@ def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
     final_dataset_embeddings = torch.reshape(all_embeddings, (num_samples, embedding.size()[1])) #Final reshaping for all images in a dataset.
 
     return final_dataset_embeddings
-    
-
-
     

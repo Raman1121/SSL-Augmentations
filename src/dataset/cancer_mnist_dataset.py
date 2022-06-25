@@ -60,12 +60,13 @@ class CancerMNISTDataset(Dataset):
             An image and a label from the dataset based on the given index idx.
         """
 
+        image = read_image(self.df['path'][idx])
         label = self.df['cell_type_idx'][idx]
 
         if(self.transforms):
             #Check if torchvision transforms are provided
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
-                image = read_image(self.df['path'][idx])
+                
                 image = self.transforms(image)
                 image = image.float()
                 
@@ -74,6 +75,9 @@ class CancerMNISTDataset(Dataset):
             elif(type(self.transforms) == A.core.composition.Compose):
                 pillow_image = Image.open(self.df['path'][idx])
                 image = np.array(pillow_image)
+
+                #Convert to uint8 type
+                image = image.astype(np.uint8)
 
                 #image = image.cpu().detach().numpy()            #Albumentation takes image as a numpy array.
                 image = self.transforms(image=image)['image']

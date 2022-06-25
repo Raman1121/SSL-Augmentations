@@ -39,7 +39,7 @@ def test_load_supervised_model(dataset_name):
         TRAIN_MLP = True
         transform_type = 'albumentations'
 
-        results_dict = load_dataloaders(dataset_name, _conf_file, transform_type)
+        results_dict = load_dataloaders(dataset_name, yaml_data, transform_type)
 
         ACTIVATION = results_dict['activation']
         LOSS_FN = results_dict['loss_fn']

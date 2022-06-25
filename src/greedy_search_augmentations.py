@@ -14,6 +14,8 @@ import torchvision.transforms as T
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
@@ -26,7 +28,8 @@ from albumentations.augmentations.geometric.transforms import *
 from albumentations.augmentations.geometric.resize import Resize
 
 from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
-from model import supervised_model
+from model import supervised_model, mean_embedding_model
+from augs import standard_augmentations
 
 import argparse
 import yaml
@@ -38,6 +41,7 @@ parser = argparse.ArgumentParser(description='Hyper-parameters management')
 parser.add_argument('--dataset', type=str, default='retinopathy', help='Dataset to use for training')
 parser.add_argument('--experimental_run', type=bool, default=False, help='Experimental run (unit test)')
 parser.add_argument('--train_mlp', type=bool, default=False, help='Train an MLP instead of a single layer')
+parser.add_argument('--use_mean_embeddings', type=bool, default=False, help='Use mean embeddings for running the experiments')
 
 args = parser.parse_args()
 
@@ -72,6 +76,7 @@ ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 LOGGING = True
 TRAIN_MLP = args.train_mlp
+USE_MEAN_EMBEDDINGS = args.use_mean_embeddings
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -86,7 +91,7 @@ NUM_CLASSES = yaml_data['all_datasets'][DATASET]['num_classes']
 SAVED_MODELS_DIR = '../Saved_models'
 
 if(EXPERIMENTAL_RUN):
-    INNER_EPOCHS = 1
+    INNER_EPOCHS = 3
     TEST_EPOCHS = 1
     AUTO_LR_FIND = False
     LOGGING = False
@@ -110,36 +115,42 @@ if(TRAIN_MLP):
 crop_height = 224
 crop_width = 224
 
-aug_dict = {
-            CLAHE(): 1,
-            ColorJitter(): 2,
-            Downscale(): 3,
-            Emboss(): 4,
-            ShiftScaleRotate(): 5,
-            HorizontalFlip(): 6,
-            VerticalFlip(): 7,
-            ImageCompression(): 8,
-            Rotate(): 9,
-            Normalize(): 10,
-            Perspective(): 11
-            }
+# aug_dict = {
+#             CLAHE(): 1,
+#             ColorJitter(): 2,
+#             Downscale(): 3,
+#             Emboss(): 4,
+#             ShiftScaleRotate(): 5,
+#             HorizontalFlip(): 6,
+#             VerticalFlip(): 7,
+#             ImageCompression(): 8,
+#             Rotate(): 9,
+#             Normalize(): 10,
+#             Perspective(): 11
+#             }
 
 
 
 # Make sure to maintain the same order of augmentations here as in aug_dict dictionary
-aug_dict_labels = {
-                   'CLAHE': 1,
-                   'CJ': 2,
-                   'DS': 3,
-                   'EB': 4,
-                   'SSR': 5,
-                   'HF': 6,
-                   'VF': 7,
-                   'IC': 8,
-                   'Rotate': 9,
-                   'INet_Norm':10,
-                   'Perspective':11
-                   }
+# aug_dict_labels = {
+#                    'CLAHE': CLAHE(),
+#                    'CJ': ColorJitter(),
+#                    'DS': Downscale(),
+#                    'EB': Emboss(),
+#                    'SSR': ShiftScaleRotate(),
+#                    'HF': HorizontalFlip(),
+#                    'VF': VerticalFlip(),
+#                    'IC': ImageCompression(),
+#                    'Rotate': Rotate(),
+#                    'INet_Norm':Normalize(),
+#                    'Perspective':Perspective()
+#                    }
+
+#Importing augmentations
+augs = standard_augmentations.StandardAugmentations()
+aug_dict = augs.aug_dict
+aug_dict_labels = augs.aug_dict_labels
+new_aug_dict = augs.new_aug_dict
 
 
 all_aug_list = list(aug_dict.keys())
@@ -165,6 +176,8 @@ val_results_dict = {'aug':[],
                      'f1':[]
                      }
 
+pprint(yaml_data)
+
 while(len(all_aug_list) > 0):
 
     print("Number of augmentations remaining {}".format(len(all_aug_list)))
@@ -173,11 +186,12 @@ while(len(all_aug_list) > 0):
     _aug_results = {'aug':[],
                     'aug_label': [],
                     'f1':[]}
+    
+    print("\n")
+    print("############# Initiating a new pass #############")
 
     for _aug, _aug_label in zip(all_aug_list, all_aug_labels_list):
         
-        print("############# Initiating a new pass #############")
-
         if(LOGGING):
             print("############# Initiating a new pass #############", f)
 
@@ -192,10 +206,22 @@ while(len(all_aug_list) > 0):
 
         #Add required basic transforms here.
         augs_for_this_pass = [Resize(224, 224)] + all_selected_augs + [_aug]
-        
+        aug_labels_for_this_pass = all_selected_augs_labels + [_aug_label]
 
-        train_transform = A.Compose(augs_for_this_pass)
-        basic_transform = A.Compose([Resize(224, 224)])
+        print("#####################################")
+        print("augs for this pass: ")
+        print(all_selected_augs_labels, '+', [_aug_label])
+
+        if(USE_MEAN_EMBEDDINGS):
+            EXPERIMENT = 'mean_embeddings_'
+            train_transform = None
+            basic_transform = None
+        
+        else:
+            train_transform = A.Compose(augs_for_this_pass)
+            basic_transform = A.Compose([Resize(224, 224)])
+
+        
 
         ##################################### DATASETS & DATALOADERS #######################################
 
@@ -209,16 +235,36 @@ while(len(all_aug_list) > 0):
         MULTILABLE = results_dict['multilable']
         CLASS_WEIGHTS = results_dict['class_weights']
 
+        #raise SystemExit(0)
+
         ######################################################################################
 
-        model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+        if(USE_MEAN_EMBEDDINGS):
+            
+            model = mean_embedding_model.MeanEmbeddingModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                                 do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
-                                                activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
+                                                activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE,
+                                                aug_list = aug_labels_for_this_pass, aug_dict_labels=aug_dict_labels, k=5)
+
+        else:
+
+            model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+                                                    class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
+                                                    do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
+                                                    activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
+
+
+        #Defining Callbacks
+
+        es = EarlyStopping('f1_score', check_finite=True, patience=10, verbose=True, mode="max")
+        mc = ModelCheckpoint(dirpath='lightning_logs/', auto_insert_metric_name=True,
+                         filename=EXPERIMENT+'-{epoch:02d}-{val_loss:.2f}')
 
         trainer = pl.Trainer(gpus=GPUs, 
-                            max_epochs=INNER_EPOCHS,
-                            )
+                        max_epochs=INNER_EPOCHS,
+                        callbacks=[es, mc]
+                        )
 
         if(AUTO_LR_FIND):
             lr_finder = trainer.tuner.lr_find(model, train_image_loader, update_attr=True)
@@ -228,9 +274,9 @@ while(len(all_aug_list) > 0):
 
         #In this case, we have train, validation, and test dataloaders for all datasets
         trainer.fit(model, train_image_loader)
-
+        
         #Perform validation here to obtain initial metrics
-        validation_results = trainer.validate(dataloaders=val_image_loader)
+        validation_results = trainer.validate(dataloaders=val_image_loader, ckpt_path='best')
 
         run_acc = validation_results[0]['val_acc']
         run_loss = validation_results[0]['val_loss']
@@ -253,12 +299,37 @@ while(len(all_aug_list) > 0):
     augmentation_labels = _aug_results['aug_label']
     f1_scores = _aug_results['f1']
 
-    #print("Augmentations: ", augmentations)
-    print("f1 scores [0]: ", f1_scores[0])
-    print("augmentations [0]: ", augmentations[0])
-    print("augmentation_labels [0]: ", augmentation_labels[0])
+    print("f1_scores", f1_scores)
+    print("augmentation_labels", augmentation_labels)
+    print("augmentations", augmentations)
 
-    l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentation_labels), reverse=True)))
+    #l1, l2, l3 = (list(t) for t in zip(*sorted(zip(f1_scores, augmentations, augmentation_labels), reverse=True)))
+
+    #SORTING THE LISTS HERE
+    _temp_d = {}
+    for i in range(len(f1_scores)):
+        _temp_d[f1_scores[i]] = [augmentations[i], augmentation_labels[i]]
+
+    _sorted_f1 = sorted(list(_temp_d.keys()), reverse=True)
+
+    _sorted_d = {}
+    for i in range(len(_sorted_f1)):
+        _sorted_d[_sorted_f1[i]] = _temp_d[_sorted_f1[i]]
+
+    # _sorted_d contains the values sorted by f1_score
+    l1 = list(_sorted_d.keys())
+    l2 = []
+    l3 = []
+
+    _sored_d_values = list(_sorted_d.values())
+
+    for i in range(len(_sorted_d)):
+        _ = _sored_d_values[i]
+        l2.append(_[0])
+        l3.append(_[1])
+
+
+    #raise SystemExit(0)
 
     sorted_dict['f1'] = l1
     sorted_dict['aug'] = l2
@@ -337,21 +408,33 @@ for augmentations_list, augmentations_labels_list in zip(greedy_augmentations_li
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                                 do_finetune=DO_FINETUNE, 
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
+    #Callbacks 
+
+    es = EarlyStopping('f1_score', check_finite=True, patience=10, verbose=True, mode="max")
+
+    mc = ModelCheckpoint(dirpath='lightning_logs/', auto_insert_metric_name=True,
+                         filename=EXPERIMENT+'_'+'test_model_'+'-{epoch:02d}-{val_loss:.2f}')
 
     trainer = pl.Trainer(gpus=GPUs, 
                         max_epochs=TEST_EPOCHS,
-                        )
+                        callbacks=[es, mc])
 
     if(AUTO_LR_FIND):
-        lr_finder = trainer.tuner.lr_find(model, train_image_loader, update_attr=True)
+        lr_finder = trainer.tuner.lr_find(model, train_image_loader, val_image_loader, update_attr=True)
         new_lr = lr_finder.suggestion()
         print("New suggested learning rate is: ", new_lr)
         model.hparams.learning_rate = new_lr
 
+        print("Learning rate set to {}".format(model.hparams.learning_rate))
+        print("\n")
+        print("\n")
+
+    print("################ Initiating training process ####################")
+
     #In this case, we have train, validation, and test dataloaders for all datasets
     trainer.fit(model, train_image_loader)
 
-    test_results = trainer.test(dataloaders=test_image_loader)
+    test_results = trainer.test(dataloaders=test_image_loader, ckpt_path='best')
         
     run_acc = test_results[0]['test_acc']
     run_loss = test_results[0]['test_loss']
@@ -425,7 +508,6 @@ if(LOGGING):
     f.close()
 
 
-#raise SystemExit(0)
 
 
 

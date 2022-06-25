@@ -1,4 +1,4 @@
-EXPERIMENT DATE: 2022-06-12
+EXPERIMENT DATE: 2022-06-20
 {'all_datasets': {'cancer_mnist': {'num_classes': 7,
                                    'root_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/',
                                    'train_df_path': '/home/co-dutt1/rds/hpc-work/SSL-Augmentations/data/CancerMNIST/HAM10000_modified_metadata.csv'},
@@ -23,12 +23,12 @@ EXPERIMENT DATE: 2022-06-12
                                   'val_cat_labels': ['Good',
                                                      'Usable',
                                                      'Reject']}},
- 'run': {'aug_bit_vector': [0, 0, 0, 0, 0, 0, 0, 0, 0],
+ 'run': {'aug_bit_vector': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
          'auto_lr_find': True,
          'batch_size': 256,
          'do_finetune': False,
          'encoder': 'resnet50',
-         'epochs': 30,
+         'epochs': 40,
          'experiment': 'bernoulli_k_bit',
          'log_folder': 'log_files',
          'lr_rate': 0.0003,

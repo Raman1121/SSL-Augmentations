@@ -27,17 +27,17 @@ from albumentations.augmentations.geometric.resize import Resize
 def test_get_aug_from_vector(aug_bit_vector):
 
     aug_dict_labels = {
-                   'CLAHE': 1,
-                   'CJ': 2,
-                   'DS': 3,
-                   'EB': 4,
-                   'SSR': 5,
-                   'HF': 6,
-                   'VF': 7,
-                   'IC': 8,
-                   'Rotate': 9,
-                   'INet_Norm':10,
-                   'Perspective':11
+                   'CLAHE': CLAHE(),
+                   'CJ': ColorJitter(),
+                   'DS': Downscale(),
+                   'EB': Emboss(),
+                   'SSR': ShiftScaleRotate(),
+                   'HF': HorizontalFlip(),
+                   'VF': VerticalFlip(),
+                   'IC': ImageCompression(),
+                   'Rotate': Rotate(),
+                   'INet_Norm':Normalize(),
+                   'Perspective':Perspective()
                    }
 
     _selected_augs = utils.get_aug_from_vector(aug_dict_labels, aug_bit_vector)

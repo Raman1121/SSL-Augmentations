@@ -1,10 +1,6 @@
 import torch
 from torch import nn
 
-# import timm
-# from timm.data import resolve_data_config
-# from timm.data.transforms_factory import create_transform
-
 from torch.optim.lr_scheduler import CyclicLR, CosineAnnealingLR, ReduceLROnPlateau
 from torch.optim import Adam
 from torch.nn.functional import cross_entropy
@@ -15,11 +11,18 @@ import torchvision.models as models
 from pl_bolts.models.self_supervised import SimCLR
 from pytorch_lightning.core.lightning import LightningModule
 
+import albumentations as A
+import torchvision.transforms as T
+from albumentations.augmentations.transforms import *
+from albumentations.augmentations.crops.transforms import *
+from albumentations.augmentations.geometric.rotate import *
+from albumentations.augmentations.geometric.transforms import *
+from albumentations.augmentations.geometric.resize import Resize
 
-class SupervisedModel(LightningModule):
+class MeanEmbeddingModel(LightningModule):
     def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50_supervised', lr_rate=0.001, 
                 lr_scheduler='none', do_finetune=True, train_mlp=False, activation='softmax', criterion='cross_entropy', 
-                multilable=False):
+                multilable=False, aug_list=None, aug_dict_labels=None, k=10):
 
         super().__init__()
 
@@ -31,9 +34,13 @@ class SupervisedModel(LightningModule):
         self.lr_scheduler = lr_scheduler
         self.activation = activation
         self.multilable = multilable
-        
-        #self.criterion = nn.BCELoss()
-        
+        self.aug_list = aug_list            #List of augmentation labels
+        self.aug_dict_labels = aug_dict_labels
+        self.k = k
+
+        assert self.aug_list != None
+        assert self.aug_dict_labels != None
+
         if(criterion == 'cross_entropy'):
             #self.criterion = nn.functional.cross_entropy()  #This combines log_softmax with cross_entropy
             self.criterion = nn.CrossEntropyLoss(weight=self.class_weights)
@@ -71,8 +78,6 @@ class SupervisedModel(LightningModule):
             else:
                 self.classifier = nn.Linear(768, self.num_classes)
             
-            
-
         elif(self.encoder == 'simclr'):
             weight_path = 'https://pl-bolts-weights.s3.us-east-2.amazonaws.com/simclr/bolts_simclr_imagenet/simclr_imagenet.ckpt'
             simclr = SimCLR.load_from_checkpoint(weight_path, strict=False)
@@ -87,7 +92,6 @@ class SupervisedModel(LightningModule):
             else:
                 self.classifier = nn.Linear(2048, self.num_classes)
 
-
         #Check for finetuning
         if(not do_finetune):
 
@@ -96,20 +100,10 @@ class SupervisedModel(LightningModule):
             for param in self.feature_extractor.parameters():
                 param.requires_grad = False
 
-    # def forward(self, x):
-    #     # self.feature_extractor.eval()
-    #     # with torch.no_grad():
-    #     #     representations = self.feature_extractor(x).flatten(1)
+    def get_aug_object(self, aug_label):
+        
+        return self.aug_dict_labels[aug_label]
 
-    #     # x = self.classifier(representations)
-
-    #     x = self.feature_extractor(x)
-    #     x = x.view(x.size(0), -1)
-    #     x = self.classifier(x)
-
-    #     print("In forward method!")
-
-    #     return x
 
     def calculate_acc(self, probs, true_labels, multilable=False):
 
@@ -139,7 +133,6 @@ class SupervisedModel(LightningModule):
             
         return acc
 
-
     def calculate_f1(self, probs, true_labels, multilable=False):
 
         if(multilable):
@@ -162,25 +155,114 @@ class SupervisedModel(LightningModule):
 
         return f1
 
+    def get_mean_embeddings(self, images):
+
+        
+        batch_images_tensor = torch.Tensor([])  # A tensor to hold all the images in a batch
+        batch_images_tensor = batch_images_tensor.cuda()
+
+        for i in range(images.shape[0]):
+
+            '''
+            LOOP NUMBER 1
+            For each image:
+            [Selecting an image from a batch]
+            '''
+
+            all_embed_img = torch.tensor([])    #A tensor to hold embeddings of all augmentations of an image
+            all_embed_img = all_embed_img.cuda()
+
+            _img = images[i]
+
+            #Convert to channel_last format for albumentations
+            _img = np.asarray(T.ToPILImage()(_img))
+
+            #_img = _img.numpy()
+
+            for _aug in self.aug_list:
+
+                '''
+                LOOP NUMBER 2
+                For each augmentation:
+                [Selecting an augmentation from the set of all augmentations]
+                '''
+
+                all_embed_aug = torch.tensor([])    #A tensor to hold all embeddings for different samples of a particular augmentation
+                all_embed_aug = all_embed_aug.cuda()
+
+                for _k in range(self.k):
+
+                    '''
+                    LOOP NUMBER 3
+                    FOR EACH SAMPLE OF AN AUGMENTATION
+                    [Sampling an augmentation]
+                    '''
+
+
+                    sampled_aug = self.get_aug_object(_aug)  #New augmentation sampled with different random params
+                    transform = A.Compose([Resize(224, 224), sampled_aug])
+                    transformed_img = transform(image = _img)["image"]
+
+                    #print(type(transformed_img))
+                    #print(transformed_img.shape)        # [224, 224, 3]
+
+                    #Convert this image to a float tensor
+                    transformed_img = torch.from_numpy(transformed_img)
+                    transformed_img = transformed_img.float()
+
+                    #Convert to channel_first format here
+                    transformed_img = transformed_img.permute(2, 0, 1)      # [3, 224, 224]
+
+                    #Expand dimension
+                    transformed_img = transformed_img[None, :]
+                    transformed_img = transformed_img.cuda()
+                    #print(transformed_img.shape)          
+
+                    #Pass each transformed input through the model
+                    if(self.encoder == 'resnet50'):
+                        representations = self.feature_extractor(transformed_img).flatten(1)
+                    elif(self.encoder == 'vit_patch16'):
+                        representations = self.feature_extractor(transformed_img)
+                    elif(self.encoder == 'simclr'):
+                        representations = self.feature_extractor(transformed_img)[0]
+
+                    #Append the Representations and take mean
+                    #all_embed_img = torch.cat((all_embed_img, representations), 0)
+                    #print("representations: ", representations.shape[1])
+                    all_embed_aug = torch.cat((all_embed_aug, representations), 0)
+
+                all_embed_aug = torch.mean(all_embed_aug, 0)    #Mean of different samples of the same augmentation [1, 2048]
+            
+                all_embed_img = torch.cat((all_embed_img,           #Adding the mean embedding obtained via different samples of an augmentation.
+                                       all_embed_aug), 0)
+                #all_embed_img = torch.mean(all_embed_img, 0)  #[1, 2048]
+                #print("Shape here: ", all_embed_img.shape)
+
+            all_embed_img = torch.reshape(all_embed_img, (len(self.aug_list), representations.size()[1]))   #[number of augmentations, embedding_size]
+            
+            all_embed_img = torch.mean(all_embed_img, 0) #Final embeddings generated after multiple samples of all augmentations for an image [1, embedding_size]
+            #print(all_embed_img.shape)
+            batch_images_tensor = torch.cat((batch_images_tensor, all_embed_img), 0)    
+        
+        batch_images_tensor = torch.reshape(batch_images_tensor, (images.shape[0], representations.shape[1]))       #Shape: [batch_size, 2048]
+        assert batch_images_tensor.shape == torch.Size([images.shape[0], representations.shape[1]])
+
+        return batch_images_tensor
 
 
     def training_step(self, batch, batch_idx):
-
-        #total_acc = 0
         
         images, labels = batch
-        _img = images[0]
 
-        if(self.encoder == 'resnet50'):
-            representations = self.feature_extractor(images).flatten(1)
-        elif(self.encoder == 'vit_patch16'):
-            representations = self.feature_extractor(images)
-        elif(self.encoder == 'simclr'):
-            representations = self.feature_extractor(images)[0]
+        #print(images.device)
 
-        #print("Representations: ", representations.shape)
+        images = images.cuda()
+        labels = labels.cuda()
 
-        logits = self.classifier(representations)  #LOGITS (Unnormalized)
+        #print(images.device)
+        
+        batch_images_tensor = self.get_mean_embeddings(images)
+        logits = self.classifier(batch_images_tensor)  #LOGITS (Unnormalized)
 
         #Convert Logits to probabilities
         if(self.activation == 'softmax'):
@@ -188,11 +270,14 @@ class SupervisedModel(LightningModule):
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
             f1 = self.calculate_f1(probabilities, labels, self.multilable)
-            
+
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
             f1 = self.calculate_f1(probabilities, labels, self.multilable)
+
+        #print("Probabilities Shape: ", probabilities.shape)
+        #print("Labels Shape: ", labels.shape)
 
         #Calculate loss using probabilities
         loss = self.criterion(probabilities, labels)
@@ -204,19 +289,15 @@ class SupervisedModel(LightningModule):
 
         return {'acc':acc, 'loss':loss, 'f1_score':f1}
 
-
+    
     def validation_step(self, batch, batch_idx):
-        
         images, labels = batch
 
-        if(self.encoder == 'resnet50'):
-            representations = self.feature_extractor(images).flatten(1)
-        elif(self.encoder == 'vit_patch16'):
-            representations = self.feature_extractor(images)
-        elif(self.encoder == 'simclr'):
-            representations = self.feature_extractor(images)[0]
-
-        logits = self.classifier(representations)  #LOGITS (Unnormalized)
+        images = images.cuda()
+        labels = labels.cuda()
+        
+        batch_images_tensor = self.get_mean_embeddings(images)
+        logits = self.classifier(batch_images_tensor)  #LOGITS (Unnormalized)
 
         #Convert Logits to probabilities
         if(self.activation == 'softmax'):
@@ -224,7 +305,7 @@ class SupervisedModel(LightningModule):
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
             f1 = self.calculate_f1(probabilities, labels, self.multilable)
-            
+
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
@@ -239,12 +320,13 @@ class SupervisedModel(LightningModule):
         self.log('f1_score', f1, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return {'acc':acc, 'loss':loss, 'f1_score':f1}
-        
 
 
     def test_step(self, batch, batch_idx):
-        
         images, labels = batch
+
+        images = images.cuda()
+        labels = labels.cuda()
 
         if(self.encoder == 'resnet50'):
             representations = self.feature_extractor(images).flatten(1)
@@ -276,7 +358,9 @@ class SupervisedModel(LightningModule):
         self.log('f1_score', f1, on_step=False, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
 
         return {'acc':acc, 'loss':loss, 'f1_score':f1}
-        
+
+
+
     def configure_optimizers(self):
         #optimizer = torch.optim.Adam(self.classifier.parameters(), lr=self.learning_rate)
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=0.0008)
@@ -296,6 +380,11 @@ class SupervisedModel(LightningModule):
                     "monitor": 'train_loss'
                 }}
 
+
+
+
+
+
+
+
     
-
-

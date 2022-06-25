@@ -81,12 +81,13 @@ class ChexpertDataset(Dataset):
         """
 
         image_path = self.image_paths[idx]
+        image = read_image(image_path, mode=ImageReadMode.RGB)
 
         if(self.transforms):
 
             #Check if torchvision transforms are provided
             if(type(self.transforms) == torchvision.transforms.transforms.Compose):
-                image = read_image(image_path, mode=ImageReadMode.RGB)
+                
                 image = self.transforms(image)
                 image = image.float()
 
@@ -96,14 +97,17 @@ class ChexpertDataset(Dataset):
                 pillow_image = pillow_image.convert('RGB')
                 image = np.array(pillow_image)
 
-                #image = image.cpu().detach().numpy()            #Albumentation takes image as a numpy array.
+                #Convert to uint8 type
+                image = image.astype(np.uint8)
+
                 image = self.transforms(image=image)['image']
 
                 image = torch.from_numpy(image)
                 image = image.permute(2, 0, 1)
 
                 #image = image.type(torch.FloatTensor)
+                
                 image = image.float()
-                #print(image.dtype)
+            
 
         return image, torch.FloatTensor(self.image_labels[idx])

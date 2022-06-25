@@ -42,9 +42,9 @@ def create_albumentations_transform():
 
 
 
-def load_dataloaders(dataset_name, config_file, transform_type):
+def load_dataloaders(dataset_name, yaml_data, transform_type):
     conf_folder = '../../conf/'
-    yaml_data = load_config_file(os.path.join(conf_folder, config_file))
+    #yaml_data = load_config_file(os.path.join(conf_folder, config_file))
 
     assert transform_type in ['torchvision', 'albumentations']
 
