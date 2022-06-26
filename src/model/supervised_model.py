@@ -133,7 +133,7 @@ class SupervisedModel(LightningModule):
 
         else:
             _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
-            #print(_arr, _counts/_counts.sum()*100)
+            print(_arr, _counts/_counts.sum()*100)
             #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
             acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
             

@@ -148,10 +148,10 @@ crop_width = 224
 #                    }
 
 #Importing augmentations
-augs = standard_augmentations.StandardAugmentations()
+augs = standard_augmentations.StandardAugmentations(shuffle=True)
 aug_dict = augs.aug_dict
 aug_dict_labels = augs.aug_dict_labels
-new_aug_list = augs.new_aug_list
+new_aug_dict = augs.new_aug_dict
 
 all_test_acc = []
 all_test_loss = []
@@ -170,7 +170,7 @@ all_results = {
                 'val_acc': [],
                 'val_loss': [],
                 'val_f1': [],
-                'k_bit_representation': [0]*len(aug_dict),
+                'k_bit_representation': [0]*len(new_aug_dict),
                 'run': []
                 }
 
@@ -209,15 +209,18 @@ for _run in range(NUM_RUNS):
             Use augmentations governed by the bit_vector provided by the user
             '''
 
-            assert len(AUG_BIT_VECTOR) == len(aug_dict)
+            assert len(AUG_BIT_VECTOR) == len(new_aug_dict)
 
             print("Using augmentation bit vector provided in the config file.")
 
             aug_bit = AUG_BIT_VECTOR
-            _selected_augs, _selected_aug_labels = utils.get_aug_from_vector(aug_dict_labels, AUG_BIT_VECTOR)
+            #_selected_augs, _selected_aug_labels = utils.get_aug_from_vector(aug_dict_labels, AUG_BIT_VECTOR)
+            _selected_augs, _selected_aug_labels = utils.get_aug_from_vector(new_aug_dict, AUG_BIT_VECTOR)
+
+            #raise SystemExit(0)
             
 
-            if(np.sum(AUG_BIT_VECTOR) == len(aug_dict)):
+            if(np.sum(AUG_BIT_VECTOR) == len(new_aug_dict)):
                 EXPERIMENT = 'baseline_all_augs'
             elif(np.sum(AUG_BIT_VECTOR) == 0):
                 EXPERIMENT = 'baseline_no_augs'
@@ -229,8 +232,8 @@ for _run in range(NUM_RUNS):
             '''
 
             print("Generating augmentation bit vector through bernoulli sampling")
-            _selected_augs, aug_bit = utils.gen_binomial_dict(aug_dict)
-            _selected_augs, _selected_aug_labels = utils.get_aug_from_vector(aug_dict_labels, aug_bit)
+            _selected_augs, aug_bit = utils.gen_binomial_dict(new_aug_dict)
+            _selected_augs, _selected_aug_labels = utils.get_aug_from_vector(new_aug_dict, aug_bit)
 
         if(TRAIN_MLP):
             EXPERIMENT = EXPERIMENT + '_with_mlp_'
@@ -278,7 +281,7 @@ for _run in range(NUM_RUNS):
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                                 do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE,
-                                                aug_list = _selected_aug_labels, aug_dict_labels=aug_dict_labels, k=1)
+                                                aug_list = _selected_aug_labels, new_aug_dict=new_aug_dict, k=1)
 
     else:
 

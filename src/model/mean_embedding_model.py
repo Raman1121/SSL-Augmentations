@@ -22,7 +22,7 @@ from albumentations.augmentations.geometric.resize import Resize
 class MeanEmbeddingModel(LightningModule):
     def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50_supervised', lr_rate=0.001, 
                 lr_scheduler='none', do_finetune=True, train_mlp=False, activation='softmax', criterion='cross_entropy', 
-                multilable=False, aug_list=None, aug_dict_labels=None, k=10):
+                multilable=False, aug_list=None, new_aug_dict=None, k=10):
 
         super().__init__()
 
@@ -35,11 +35,11 @@ class MeanEmbeddingModel(LightningModule):
         self.activation = activation
         self.multilable = multilable
         self.aug_list = aug_list            #List of augmentation labels
-        self.aug_dict_labels = aug_dict_labels
+        self.new_aug_dict = new_aug_dict
         self.k = k
 
         assert self.aug_list != None
-        assert self.aug_dict_labels != None
+        assert self.new_aug_dict != None
 
         if(criterion == 'cross_entropy'):
             #self.criterion = nn.functional.cross_entropy()  #This combines log_softmax with cross_entropy
@@ -102,7 +102,7 @@ class MeanEmbeddingModel(LightningModule):
 
     def get_aug_object(self, aug_label):
         
-        return self.aug_dict_labels[aug_label]
+        return self.new_aug_dict[aug_label]
 
 
     def calculate_acc(self, probs, true_labels, multilable=False):
@@ -127,7 +127,7 @@ class MeanEmbeddingModel(LightningModule):
 
         else:
             _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
-            #print(_arr, _counts/_counts.sum()*100)
+            print(_arr, _counts/_counts.sum()*100)
             #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
             acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
             
@@ -328,14 +328,11 @@ class MeanEmbeddingModel(LightningModule):
         images = images.cuda()
         labels = labels.cuda()
 
-        if(self.encoder == 'resnet50'):
-            representations = self.feature_extractor(images).flatten(1)
-        elif(self.encoder == 'vit_patch16'):
-            representations = self.feature_extractor(images)
-        elif(self.encoder == 'simclr'):
-            representations = self.feature_extractor(images)[0]
+        print(images.dtype)
+        print(labels.dtype)
 
-        logits = self.classifier(representations)  #LOGITS (Unnormalized)
+        batch_images_tensor = self.get_mean_embeddings(images)
+        logits = self.classifier(batch_images_tensor)  #LOGITS (Unnormalized)
 
         #Convert Logits to probabilities
         if(self.activation == 'softmax'):
@@ -343,7 +340,7 @@ class MeanEmbeddingModel(LightningModule):
             #acc = np.array(np.argmax(probabilities.cpu().detach().numpy(), axis=1) == labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / representations.size(0)
             acc = self.calculate_acc(probabilities, labels, self.multilable)
             f1 = self.calculate_f1(probabilities, labels, self.multilable)
-            
+
         elif(self.activation == 'sigmoid'):
             probabilities = torch.sigmoid(logits)
             acc = self.calculate_acc(probabilities, labels, self.multilable)

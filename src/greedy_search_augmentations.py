@@ -115,46 +115,18 @@ if(TRAIN_MLP):
 crop_height = 224
 crop_width = 224
 
-# aug_dict = {
-#             CLAHE(): 1,
-#             ColorJitter(): 2,
-#             Downscale(): 3,
-#             Emboss(): 4,
-#             ShiftScaleRotate(): 5,
-#             HorizontalFlip(): 6,
-#             VerticalFlip(): 7,
-#             ImageCompression(): 8,
-#             Rotate(): 9,
-#             Normalize(): 10,
-#             Perspective(): 11
-#             }
-
-
-
-# Make sure to maintain the same order of augmentations here as in aug_dict dictionary
-# aug_dict_labels = {
-#                    'CLAHE': CLAHE(),
-#                    'CJ': ColorJitter(),
-#                    'DS': Downscale(),
-#                    'EB': Emboss(),
-#                    'SSR': ShiftScaleRotate(),
-#                    'HF': HorizontalFlip(),
-#                    'VF': VerticalFlip(),
-#                    'IC': ImageCompression(),
-#                    'Rotate': Rotate(),
-#                    'INet_Norm':Normalize(),
-#                    'Perspective':Perspective()
-#                    }
-
 #Importing augmentations
-augs = standard_augmentations.StandardAugmentations()
+augs = standard_augmentations.StandardAugmentations(shuffle=True)   #Augmentations would be obtained in a shuffled order each time
 aug_dict = augs.aug_dict
 aug_dict_labels = augs.aug_dict_labels
 new_aug_dict = augs.new_aug_dict
 
 
-all_aug_list = list(aug_dict.keys())
-all_aug_labels_list = list(aug_dict_labels.keys())
+#all_aug_list = list(aug_dict.keys())
+#all_aug_labels_list = list(aug_dict_labels.keys())
+
+all_aug_list = list(new_aug_dict.values())
+all_aug_labels_list = list(new_aug_dict.keys())
 
 all_selected_augs = []
 all_selected_augs_labels = []
@@ -245,7 +217,7 @@ while(len(all_aug_list) > 0):
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                                 do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE,
-                                                aug_list = aug_labels_for_this_pass, aug_dict_labels=aug_dict_labels, k=5)
+                                                aug_list = aug_labels_for_this_pass, new_aug_dict=new_aug_dict, k=5)
 
         else:
 
@@ -404,9 +376,19 @@ for augmentations_list, augmentations_labels_list in zip(greedy_augmentations_li
 
     #####################################################################################################
 
-    model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+    if(USE_MEAN_EMBEDDINGS):
+            
+        model = mean_embedding_model.MeanEmbeddingModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
+                                            class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
+                                            do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
+                                            activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE,
+                                            aug_list = aug_labels_for_this_pass, new_aug_dict=new_aug_dict, k=5)
+
+    else:
+
+        model = supervised_model.SupervisedModel(encoder=ENCODER, batch_size = BATCH_SIZE, num_classes=NUM_CLASSES,
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
-                                                do_finetune=DO_FINETUNE, 
+                                                do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
     #Callbacks 
 
@@ -487,7 +469,7 @@ info_dict = {
                  'experiment': EXPERIMENT
             }
 
-aug_bit_vector = utils.plot_greedy_augmentations(aug_dict, aug_dict_labels, 
+aug_bit_vector = utils.plot_greedy_augmentations(new_aug_dict, 
                                 sorted_test_results_dict,
                                 info_dict,
                                 save_plot=SAVE_PLOTS)

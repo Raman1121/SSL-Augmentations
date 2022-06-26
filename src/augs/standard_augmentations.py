@@ -54,7 +54,7 @@ class StandardAugmentations:
                                 'VF': VerticalFlip(),
                                 'Rotate': Rotate(),
                                 'INet_Norm': Normalize()
-        }
+                            }
 
 
         if(shuffle):

@@ -313,7 +313,7 @@ def plot_run_stats(all_val_f1, all_test_f1, info_dict, save_dir='saved_plots/', 
     else:
         print("Saving plot skipped.")
 
-def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dict, 
+def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict, 
                               info_dict, save_dir='saved_plots/', save_plot=True):
 
     dataset = info_dict['dataset']
@@ -324,8 +324,11 @@ def plot_greedy_augmentations(aug_dict, aug_dict_labels, sorted_test_results_dic
     best_aug_list = sorted_test_results_dict['aug'][0]
     best_aug_labels = sorted_test_results_dict['aug_label'][0]
 
-    include_vector = [0]*len(aug_dict)
-    list_aug_dict_labels = list(aug_dict_labels.keys())
+    #include_vector = [0]*len(aug_dict)
+    #list_aug_dict_labels = list(aug_dict_labels.keys())
+    include_vector= [0]*len(new_aug_dict)
+    list_aug_dict_labels = list(new_aug_dict.keys())
+
 
     for aug in list_aug_dict_labels:
         if(aug in best_aug_labels):
@@ -434,29 +437,38 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
         print("Saving plot skipped.")
 
 
-def gen_binomial_dict(aug_dict):
+def gen_binomial_dict(new_aug_dict):
     '''
     A function to obtain augmentations through binomial sampling
     '''
 
-    temp_dict = {}
-    for k, v in aug_dict.items():
-        temp_dict[v] = k
+    # temp_dict = {}
+    # for k, v in aug_dict.items():
+    #     temp_dict[v] = k
 
-    aug_bit = []
-    for i in range(len(aug_dict)):
-        s = np.random.binomial(1, 0.5)          #Each augmentation has a probability of 0.5
-        aug_bit.append(s)
+    # aug_bit = []
+    # for i in range(len(aug_dict)):
+    #     s = np.random.binomial(1, 0.5)          #Each augmentation has a probability of 0.5
+    #     aug_bit.append(s)
 
-    #Finding indexes where aug_bit is 1
-    result = np.where(np.array(aug_bit) == 1)
-    indexes = result[0] + 1
+    # #Finding indexes where aug_bit is 1
+    # result = np.where(np.array(aug_bit) == 1)
+    # indexes = result[0] + 1
 
-    aug_list = []
-    for index in indexes:
-        aug_list.append(temp_dict[index])
+    # aug_list = []
+    # for index in indexes:
+    #     aug_list.append(temp_dict[index])
 
-    return aug_list, aug_bit
+    aug_bit_vector = []
+    for i in range(len(new_aug_dict)):
+        s = np.random.binomial(1, 0.5)
+        aug_bit_vector.append(s)
+    
+    aug_vec_bool = [bool(a) for a in aug_bit_vector]
+    
+    aug_list_after_sampling = list(compress(list(new_aug_dict.values()), aug_vec_bool))
+
+    return aug_list_after_sampling, aug_bit_vector
 
 
 def sort_dictionary(results_dict):
