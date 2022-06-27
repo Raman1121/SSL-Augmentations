@@ -40,7 +40,7 @@ class StandardAugmentations:
                         }
 
         self.new_aug_dict = {   
-                                'Equalize': Equalize(),
+                                'Equalize': Equalize(mode='pil'),
                                 'CJ': ColorJitter(),
                                 'CF': ChannelShuffle(),
                                 'GB': GaussianBlur(),
