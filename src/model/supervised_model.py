@@ -17,11 +17,13 @@ from pytorch_lightning.core.lightning import LightningModule
 
 
 class SupervisedModel(LightningModule):
-    def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50_supervised', lr_rate=0.001, 
+    def __init__(self, num_classes, batch_size, class_weights, encoder='resnet50', lr_rate=0.001, 
                 lr_scheduler='none', do_finetune=True, train_mlp=False, activation='softmax', criterion='cross_entropy', 
-                multilable=False):
+                multilable=False, pretrained=True):
 
         super().__init__()
+
+        self.__all_encoders__ = ['resnet50', 'simclr', 'vit_patch16']
 
         self.num_classes = num_classes
         self.batch_size = batch_size
@@ -31,6 +33,9 @@ class SupervisedModel(LightningModule):
         self.lr_scheduler = lr_scheduler
         self.activation = activation
         self.multilable = multilable
+        self.pretrained = pretrained
+
+        assert encoder in self.__all_encoders__
         
         #self.criterion = nn.BCELoss()
         
@@ -43,7 +48,7 @@ class SupervisedModel(LightningModule):
         
 
         if(self.encoder == 'resnet50'):
-            backbone = models.resnet50(pretrained=True)
+            backbone = models.resnet50(pretrained=self.pretrained)
             num_filters = backbone.fc.in_features
             layers = list(backbone.children())[:-1]
             self.feature_extractor = nn.Sequential(*layers)
@@ -58,7 +63,7 @@ class SupervisedModel(LightningModule):
                 self.classifier = nn.Linear(num_filters, self.num_classes)            
 
         elif(self.encoder == 'vit_patch16'):
-            self.feature_extractor = timm.create_model('vit_base_patch16_224_in21k', pretrained=True, num_classes=0)
+            self.feature_extractor = timm.create_model('vit_base_patch16_224_in21k', pretrained=self.pretrained, num_classes=0)
             config = resolve_data_config({}, model=self.feature_extractor)
             transform = create_transform(**config)
 
@@ -135,6 +140,8 @@ class SupervisedModel(LightningModule):
             _arr, _counts = np.unique(np.argmax(probs.cpu().detach().numpy(), axis=1), return_counts=True)
             print(_arr, _counts/_counts.sum()*100)
             #print(np.unique(true_labels.cpu().data.view(-1).numpy(), return_counts=True))
+            #print("Probs: ", np.argmax(probs.cpu().detach().numpy(), axis=1))
+            #print("True Labels: ", true_labels.cpu().data.view(-1).numpy())
             acc = np.array(np.argmax(probs.cpu().detach().numpy(), axis=1) == true_labels.cpu().data.view(-1).numpy()).astype('int').sum().item() / probs.size(0)
             
         return acc
@@ -169,7 +176,6 @@ class SupervisedModel(LightningModule):
         #total_acc = 0
         
         images, labels = batch
-        _img = images[0]
 
         if(self.encoder == 'resnet50'):
             representations = self.feature_extractor(images).flatten(1)
