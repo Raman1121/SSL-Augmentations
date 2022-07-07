@@ -314,7 +314,7 @@ def plot_run_stats(all_val_f1, all_test_f1, info_dict, save_dir='saved_plots/', 
         print("Saving plot skipped.")
 
 def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict, 
-                              info_dict, save_dir='saved_plots/', save_plot=True):
+                              info_dict, save_dir='saved_plots/final_plots/', save_plot=True):
 
     dataset = info_dict['dataset']
     encoder = info_dict['encoder']
@@ -376,7 +376,8 @@ def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict,
 
     return include_vector
 
-def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot=True, save_dir='saved_plots/'):
+def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot=True, 
+                              save_dir='saved_plots/'):
     
 
     dataset = info_dict['dataset']
@@ -410,7 +411,8 @@ def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot
     if(save_plot):
         plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
 
-def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, save_plot=True, save_dir='saved_plots/'):
+def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, save_plot=True, 
+                              save_dir='saved_plots/intermediate_plots/'):
 
     if(save_plot):
 
