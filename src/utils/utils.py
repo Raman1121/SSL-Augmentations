@@ -320,6 +320,29 @@ def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict,
     encoder = info_dict['encoder']
     finetune = info_dict['finetune']
     experiment = info_dict['experiment']
+    train_mlp = info_dict['train_mlp']
+    use_mean_embeddings = info_dict['use_mean_embeddings']
+    auto_lr = info_dict['auto_lr']
+
+    if(finetune == True):
+        ft_label = 'with_FT'
+    elif(finetune == False):
+        ft_label = 'without_FT'
+
+    if(train_mlp == True):
+        mlp_label = 'with_MLP'
+    elif(train_mlp == False):
+        mlp_label = 'without_MLP'
+
+    if(use_mean_embeddings == True):
+        mean_embeddings_label = 'with_ME'
+    elif(use_mean_embeddings == False):
+        mean_embeddings_label = 'without_ME'
+
+    if(auto_lr == True):
+        auto_lr_label = 'with_auto_LR'
+    elif(auto_lr == False):
+        auto_lr_label = 'without_auto_LR'
     
     best_aug_list = sorted_test_results_dict['aug'][0]
     best_aug_labels = sorted_test_results_dict['aug_label'][0]
@@ -344,11 +367,12 @@ def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict,
     plt.yticks(np.arange(0, 2, step=1))
 
     plt.suptitle("Augmentations selected using greedy search for {} dataset".format(dataset))
-    plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
-    plt.show()
+    plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr)), fontsize=10)
+
+    filename = save_dir + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label
 
     if(save_plot):
-        plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+        plt.savefig(filename + '.png')
 
     return include_vector
 
@@ -395,7 +419,30 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
         dataset = info_dict['dataset']
         encoder = info_dict['encoder']
         finetune = info_dict['finetune']
-        experiment = info_dict['experiment'] + '_intermediate_results'
+        experiment = info_dict['experiment']
+        train_mlp = info_dict['train_mlp']
+        use_mean_embeddings = info_dict['use_mean_embeddings']
+        auto_lr = info_dict['auto_lr']
+
+        if(finetune == True):
+            ft_label = 'with_FT'
+        elif(finetune == False):
+            ft_label = 'without_FT'
+
+        if(train_mlp == True):
+            mlp_label = 'with_MLP'
+        elif(train_mlp == False):
+            mlp_label = 'without_MLP'
+
+        if(use_mean_embeddings == True):
+            mean_embeddings_label = 'with_ME'
+        elif(use_mean_embeddings == False):
+            mean_embeddings_label = 'without_ME'
+
+        if(auto_lr == True):
+            auto_lr_label = 'with_auto_LR'
+        elif(auto_lr == False):
+            auto_lr_label = 'without_auto_LR'
 
         val_augs = val_results_dict['aug']
         val_aug_labels = val_results_dict['aug_label']
@@ -426,12 +473,13 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
         #plt.yticks(len(yticks), yticks)
 
         plt.suptitle("Validation and Test F1 Score during Greedy Search for {} dataset".format(dataset))
-        plt.title("Encoder: {} | Finetune: {} | Experiment: {}".format(encoder, str(finetune), experiment), fontsize=10)
+        plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr)), fontsize=10)
 
         plt.legend()
         plt.tight_layout()
-
-        plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
+        
+        filename = save_dir + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label
+        plt.savefig(filename + '.png')
 
     else:
         print("Saving plot skipped.")

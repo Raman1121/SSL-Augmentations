@@ -43,6 +43,12 @@ parser.add_argument('--experimental_run', type=bool, default=False, help='Experi
 parser.add_argument('--train_mlp', type=bool, default=False, help='Train an MLP instead of a single layer')
 parser.add_argument('--use_mean_embeddings', type=bool, default=False, help='Use mean embeddings for running the experiments')
 
+parser.add_argument('--encoder', type=str, default='resnet50', help='Encoder to be used for the experiments')
+parser.add_argument('--do_finetune', action='store_true', help='Whether to do fine-tuning or not.')
+parser.add_argument('--auto_lr_find', action='store_true', help='Whether to find learning rate automatically.')
+parser.add_argument('--lr', type=float, default=0.0003, help='Learning Rate')
+parser.add_argument('--pretrained', type=bool, default=True, help='Whether to use a pretrained encoder or not.')
+
 args = parser.parse_args()
 
 start_time = time.time()
@@ -60,23 +66,26 @@ elif(device == torch.device(type='cuda')):
 
 #RUN CONSTANTS
 BATCH_SIZE = yaml_data['run']['batch_size']
-DATASET = args.dataset
-lr_rate = yaml_data['run']['lr_rate']
 TEST_EPOCHS = yaml_data['run']['test_epochs']
 INNER_EPOCHS = yaml_data['run']['inner_epochs']
-EXPERIMENTAL_RUN = args.experimental_run
 EMBEDDINGS_DIM = 2048
 SUBSET = yaml_data['run']['subset']
-AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
 SAVE_PLOTS = yaml_data['run']['save_plots']
 EXPERIMENT = yaml_data['run']['experiment']
 LOG_FOLDER = yaml_data['run']['log_folder']
-DO_FINETUNE = yaml_data['run']['do_finetune']
-ENCODER = yaml_data['run']['encoder']
 LR_SCHEDULER = yaml_data['run']['lr_scheduler']
 LOGGING = True
+
+# CLI ARGUEMENTS
+EXPERIMENTAL_RUN = args.experimental_run
+lr_rate = args.lr
+AUTO_LR_FIND = args.auto_lr_find
+PRETRAINED = args.pretrained
 TRAIN_MLP = args.train_mlp
 USE_MEAN_EMBEDDINGS = args.use_mean_embeddings
+DO_FINETUNE = args.do_finetune
+ENCODER = args.encoder
+DATASET = args.dataset
 
 #DATASET CONSTANTS
 DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -114,6 +123,8 @@ if(TRAIN_MLP):
 
 crop_height = 224
 crop_width = 224
+
+pprint(yaml_data)
 
 #Importing augmentations
 augs = standard_augmentations.StandardAugmentations(shuffle=True)   #Augmentations would be obtained in a shuffled order each time
@@ -217,7 +228,7 @@ while(len(all_aug_list) > 0):
                                                 class_weights = CLASS_WEIGHTS, lr_rate=lr_rate, lr_scheduler=LR_SCHEDULER, 
                                                 do_finetune=DO_FINETUNE, train_mlp=TRAIN_MLP,
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE,
-                                                aug_list = aug_labels_for_this_pass, new_aug_dict=new_aug_dict, k=5)
+                                                aug_list = aug_labels_for_this_pass, new_aug_dict=new_aug_dict, k=5, pretrained=PRETRAINED)
 
         else:
 
@@ -392,7 +403,7 @@ for augmentations_list, augmentations_labels_list in zip(greedy_augmentations_li
                                                 activation=ACTIVATION, criterion=LOSS_FN, multilable=MULTILABLE)
     #Callbacks 
 
-    es = EarlyStopping('f1_score', check_finite=True, patience=10, verbose=True, mode="max")
+    es = EarlyStopping('f1_score', check_finite=True, patience=20, verbose=True, mode="max")
 
     mc = ModelCheckpoint(dirpath='lightning_logs/', auto_insert_metric_name=True,
                          filename=EXPERIMENT+'_'+'test_model_'+'-{epoch:02d}-{val_loss:.2f}')
@@ -466,7 +477,10 @@ info_dict = {
                  'dataset': DATASET,
                  'encoder': ENCODER,
                  'finetune': DO_FINETUNE,
-                 'experiment': EXPERIMENT
+                 'experiment': EXPERIMENT,
+                 'train_mlp': TRAIN_MLP,
+                 'use_mean_embeddings': USE_MEAN_EMBEDDINGS,
+                 'auto_lr': AUTO_LR_FIND
             }
 
 aug_bit_vector = utils.plot_greedy_augmentations(new_aug_dict, 
