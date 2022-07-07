@@ -107,19 +107,37 @@ if(EXPERIMENTAL_RUN):
 
 if(LOGGING):
 
+    if(DO_FINETUNE == True):
+        ft_label = 'with_FT'
+    elif(DO_FINETUNE == False):
+        ft_label = 'without_FT'
+
+    if(TRAIN_MLP == True):
+        mlp_label = 'with_MLP'
+    elif(TRAIN_MLP == False):
+        mlp_label = 'without_MLP'
+
+    if(USE_MEAN_EMBEDDINGS == True):
+        mean_embeddings_label = 'with_ME'
+    elif(USE_MEAN_EMBEDDINGS == False):
+        mean_embeddings_label = 'without_ME'
+
+    if(AUTO_LR_FIND == True):
+        auto_lr_label = 'with_auto_LR'
+    elif(AUTO_LR_FIND == False):
+        auto_lr_label = 'without_auto_LR'
+
     #Save results to a text file
-    filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '.txt'
+    filename = EXPERIMENT + '_' + DATASET + '_' + ENCODER + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label
     f = open(os.path.join(LOG_FOLDER, filename), "w")
-    f.write("EXPERIMENT DATE: {}".format(date.today()))
-    f.write("\n")
 
     pprint(yaml_data, f)
     print("Dataset: {}".format(DATASET), f)
     print("SUBSET: {}".format(SUBSET), f)
     print("Saved Models dir: {}".format(SAVED_MODELS_DIR), f)
 
-if(TRAIN_MLP):
-    EXPERIMENT = EXPERIMENT + '_mlp_'
+# if(TRAIN_MLP):
+#     EXPERIMENT = EXPERIMENT + '_mlp_'
 
 crop_height = 224
 crop_width = 224
@@ -494,7 +512,7 @@ utils.plot_intermidiate_results(val_results_dict, test_results_dict,
 end_time = time.time()
 
 print("Augmentation Bit Representation: {}".format(aug_bit_vector))
-print("Execution Time: {}".format(end_time - start_time))
+print("Execution Time: {}".format((end_time - start_time)/3600))
 
 
 if(LOGGING):
