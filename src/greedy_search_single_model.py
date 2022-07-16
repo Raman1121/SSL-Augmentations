@@ -371,6 +371,11 @@ while(len(all_aug_list) > 0):
     test_results_dict['aug_label'] += [all_selected_augs_labels[:]]
     test_results_dict['acc'] += [test_acc]
 
+    print(" ###### TEST RESULTS FROM THE BEST AUGMENTATION FROM THIS PASS ######")
+    #print("Augmentation: ", test_acc)
+    print("Accuracy: ", test_acc)
+    #print("Acc: ", test_acc)
+
 
 ######### SORTING test_results_dict ##########
 
@@ -385,10 +390,11 @@ print("\n")
 pprint(test_results_dict)
 print("\n")
 
-#l1, l2, l3 = (list(t) for t in zip(*sorted(zip(acc_scores, augmentations, augmentations_labels), reverse=True)))
+l1, l2, l3 = (list(t) for t in zip(*sorted(zip(acc_scores, augmentations, augmentations_labels), reverse=True)))
 
 ##### PERFORMING MANUAL SORTING #####
 
+'''
 _temp_d = {}
 for i in range(len(acc_scores)):
     _temp_d[acc_scores[i]] = [augmentations[i], augmentation_labels[i]]
@@ -409,6 +415,7 @@ for i in range(len(_sorted_d)):
     _ = _sored_d_values[i]
     l2.append(_[0])
     l3.append(_[1])
+'''
 
 sorted_test_results_dict['acc'] = l1
 sorted_test_results_dict['aug'] = l2
