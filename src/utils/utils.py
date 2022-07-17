@@ -646,9 +646,9 @@ def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
     final_dataset_embeddings = torch.reshape(all_embeddings, (num_samples, embedding.size()[1])) #Final reshaping for all images in a dataset.
 
     return final_dataset_embeddings
-    
 
-def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 2):
+
+def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 0.02):
 
     '''
         Get the augmentation policies that give a very similar performance as the best policy
@@ -669,8 +669,8 @@ def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 2):
         i = list(i)
 
         _metric = i[0]
-        _augmentation = i[0]
-        _aug_label = i[1]
+        _augmentation = i[1]
+        _aug_label = i[2]
 
         if((_best_metric_value - _metric) <= threshold):
             _similar_metric.append(_metric)
