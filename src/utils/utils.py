@@ -14,6 +14,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 import torch
 import os
+import random
 import pandas as pd
 import numpy as np
 import yaml
@@ -314,7 +315,7 @@ def plot_run_stats(all_val_f1, all_test_f1, info_dict, save_dir='saved_plots/', 
         print("Saving plot skipped.")
 
 def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict, 
-                              info_dict, save_dir='saved_plots/final_plots/', save_plot=True):
+                              info_dict, save_dir='saved_plots/final_plots/new_greedy_search/', save_plot=True):
 
     dataset = info_dict['dataset']
     encoder = info_dict['encoder']
@@ -323,6 +324,7 @@ def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict,
     train_mlp = info_dict['train_mlp']
     use_mean_embeddings = info_dict['use_mean_embeddings']
     auto_lr = info_dict['auto_lr']
+    metric = info_dict['metric']
 
     if(finetune == True):
         ft_label = 'with_FT'
@@ -367,12 +369,16 @@ def plot_greedy_augmentations(new_aug_dict, sorted_test_results_dict,
     plt.yticks(np.arange(0, 2, step=1))
 
     plt.suptitle("Augmentations selected using greedy search for {} dataset".format(dataset))
-    plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr)), fontsize=10)
+    plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {} | Metric: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr), metric), fontsize=10)
 
-    filename = save_dir + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label
+    filename = save_dir + experiment + '_' + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label + '_' + metric
 
     if(save_plot):
-        plt.savefig(filename + '.png')
+        if(os.path.exists(filename+'.png')):
+            random_num = random.randint(1000, 10000)
+            plt.savefig(filename + '_' + str(random_num) + '.png')  
+        else:  
+            plt.savefig(filename + '.png')
 
     return include_vector
 
@@ -412,7 +418,7 @@ def plot_multiple_runs_greedy(all_vectors, info_dict, aug_dict_labels, save_plot
         plt.savefig(save_dir + experiment + '_' + dataset + '_' + encoder + '.png')
 
 def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, save_plot=True, 
-                              save_dir='saved_plots/intermediate_plots/'):
+                              save_dir='saved_plots/intermediate_plots/new_greedy_search/'):
 
     if(save_plot):
 
@@ -425,6 +431,7 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
         train_mlp = info_dict['train_mlp']
         use_mean_embeddings = info_dict['use_mean_embeddings']
         auto_lr = info_dict['auto_lr']
+        metric = info_dict['metric']
 
         if(finetune == True):
             ft_label = 'with_FT'
@@ -448,7 +455,9 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
 
         val_augs = val_results_dict['aug']
         val_aug_labels = val_results_dict['aug_label']
-        val_f1 = val_results_dict['f1']
+        val_metric_scores = val_results_dict['metric']
+        #val_f1 = val_results_dict['f1']
+        #val_acc = val_results_dict['acc']
         val_aug_labels_list = []
 
         for e in val_aug_labels:
@@ -456,7 +465,9 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
 
         test_augs = test_results_dict['aug']
         test_aug_labels = test_results_dict['aug_label']
-        test_f1 = test_results_dict['f1']
+        test_metric_scores = test_results_dict['metric']
+        #test_f1 = test_results_dict['f1']
+        #test_acc = test_results_dict['acc']
         test_aug_labels_list = []
 
         yticks = np.arange(0, 1.1, 0.1)
@@ -465,23 +476,33 @@ def plot_intermidiate_results(val_results_dict, test_results_dict, info_dict, sa
             test_aug_labels_list.append('[' + ','.join(e) + ']')
 
         #plt.rcParams['xtick.labelsize'] = 'small'
-        plt.plot(val_aug_labels_list, val_f1, marker='o', markersize=10, label='Validation F1 Score', linewidth=4)
-        plt.plot(test_aug_labels_list, test_f1, marker='o', markersize=10, label='Test F1 Score', linewidth=4)
+        plt.plot(val_aug_labels_list, val_metric_scores, marker='o', markersize=10, label='Validation F1 Score', linewidth=4)
+        plt.plot(test_aug_labels_list, test_metric_scores, marker='o', markersize=10, label='Test F1 Score', linewidth=4)
+
+        # plt.plot(val_aug_labels_list, val_acc, marker='o', markersize=10, label='Validation Accuracy', linewidth=4)
+        # plt.plot(test_aug_labels_list, test_acc, marker='o', markersize=10, label='Test Accuracy', linewidth=4)
+
 
         plt.xlabel('Augmentation Subsets')
         plt.ylabel('F1 Score')
+        #plt.ylabel('Accuracy')
 
         #plt.xticks(len(val_aug_labels_list), val_aug_labels_list)
         #plt.yticks(len(yticks), yticks)
 
         plt.suptitle("Validation and Test F1 Score during Greedy Search for {} dataset".format(dataset))
-        plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr)), fontsize=10)
+        plt.title("Encoder: {} | Finetune: {} | MLP: {} | ME: {} | Auto_LR: {} | Metric: {}".format(encoder, str(finetune), experiment, str(train_mlp), str(use_mean_embeddings), str(auto_lr), metric), fontsize=10)
 
         plt.legend()
         plt.tight_layout()
         
-        filename = save_dir + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label
-        plt.savefig(filename + '.png')
+        filename = save_dir + experiment + '_' + dataset + '_' + encoder + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label + '_' + metric
+
+        if(os.path.exists(filename+'.png')):
+            random_num = random.randint(1000, 10000)
+            plt.savefig(filename + '_' + str(random_num) + '.png')  
+        else:  
+            plt.savefig(filename + '.png')
 
     else:
         print("Saving plot skipped.")
@@ -625,4 +646,36 @@ def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
     final_dataset_embeddings = torch.reshape(all_embeddings, (num_samples, embedding.size()[1])) #Final reshaping for all images in a dataset.
 
     return final_dataset_embeddings
+    
+
+def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 2):
+
+    '''
+        Get the augmentation policies that give a very similar performance as the best policy
+    '''
+
+    _best_metric_value = sorted_test_results_dict['metric'][0]
+
+    all_metric_scores = sorted_test_results_dict['metric']
+    all_augmentations = sorted_test_results_dict['aug']
+    all_augmentation_labels = sorted_test_results_dict['aug_label']
+
+
+    _similar_augmentations = []
+    _similar_aug_labels = []
+    _similar_metric = []
+
+    for i in zip(all_metric_scores, all_augmentations, all_augmentation_labels):
+        i = list(i)
+
+        _metric = i[0]
+        _augmentation = i[0]
+        _aug_label = i[1]
+
+        if((_best_metric_value - _metric) <= threshold):
+            _similar_metric.append(_metric)
+            _similar_aug_labels.append(_aug_label)
+            _similar_augmentations.append(_augmentation)
+
+    return _similar_augmentations, _similar_aug_labels, _similar_metric
     
