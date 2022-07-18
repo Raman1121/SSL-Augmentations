@@ -11,36 +11,8 @@ class StandardAugmentations:
 
     def __init__(self, shuffle = False):
 
-        self.aug_dict_labels = {
-                                #'CLAHE': CLAHE(),
-                                'CJ': ColorJitter(),
-                                'DS': Downscale(),
-                                'EB': Emboss(),
-                                'SSR': ShiftScaleRotate(),
-                                'HF': HorizontalFlip(),
-                                'VF': VerticalFlip(),
-                                'IC': ImageCompression(),
-                                'Rotate': Rotate(),
-                                'INet_Norm':Normalize(),
-                                'Perspective':Perspective()
-                                } 
-
-        self.aug_dict = {
-                        #CLAHE(): 1,
-                        ColorJitter(): 2,
-                        Downscale(): 3,
-                        Emboss(): 4,
-                        ShiftScaleRotate(): 5,
-                        HorizontalFlip(): 6,
-                        VerticalFlip(): 7,
-                        ImageCompression(): 8,
-                        Rotate(): 9,
-                        Normalize(): 10,
-                        Perspective(): 11
-                        }
-
         self.new_aug_dict = {   
-                                'Equalize': Equalize(mode='pil'),
+                                #'Equalize': Equalize(mode='pil'),
                                 'CJ': ColorJitter(),
                                 'CF': ChannelShuffle(),
                                 'GB': GaussianBlur(),

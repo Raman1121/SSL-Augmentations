@@ -648,7 +648,21 @@ def run_one_aug(dl, encoder, aug_dict, num_samples, num_aug_samples=10):
     return final_dataset_embeddings
 
 
-def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 0.02):
+def get_vector_from_labels(new_aug_dict, labels):
+    list_aug_dict_labels = list(new_aug_dict.keys())
+    bit_vector = [0]*len(new_aug_dict)
+
+    for aug in list_aug_dict_labels:
+        if(aug in labels):
+            #index = aug_dict_labels[aug] - 1
+            _index = list_aug_dict_labels.index(aug)
+            bit_vector[_index] = 1
+
+    return bit_vector
+
+
+
+def get_best_augmentation_schemes(sorted_test_results_dict, new_aug_dict, threshold = 0.02):
 
     '''
         Get the augmentation policies that give a very similar performance as the best policy
@@ -665,6 +679,10 @@ def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 0.02):
     _similar_aug_labels = []
     _similar_metric = []
 
+    list_aug_dict_labels = list(new_aug_dict.keys())
+    all_bit_vectors = []
+    bit_vector = [0]*len(new_aug_dict)
+
     for i in zip(all_metric_scores, all_augmentations, all_augmentation_labels):
         i = list(i)
 
@@ -672,10 +690,16 @@ def get_best_augmentation_schemes(sorted_test_results_dict, threshold = 0.02):
         _augmentation = i[1]
         _aug_label = i[2]
 
+        bit_vector = []
+
         if((_best_metric_value - _metric) <= threshold):
             _similar_metric.append(_metric)
             _similar_aug_labels.append(_aug_label)
             _similar_augmentations.append(_augmentation)
 
-    return _similar_augmentations, _similar_aug_labels, _similar_metric
+            bit_vector = get_vector_from_labels(new_aug_dict, _aug_label)
+
+            all_bit_vectors.append(bit_vector)
+
+    return _similar_augmentations, _similar_aug_labels, _similar_metric, all_bit_vectors
     

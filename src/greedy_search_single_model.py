@@ -118,7 +118,7 @@ if(EXPERIMENTAL_RUN):
     INNER_EPOCHS = 3
     TEST_EPOCHS = 1
     AUTO_LR_FIND = False
-    LOGGING = False
+    LOGGING = True
 
 if(LOGGING):
 
@@ -551,22 +551,20 @@ sorted_test_results_dict['aug_label'] = l3
 print("############################ RESULTS FROM VALIDATION STAGE ############################")
 pprint(val_results_dict['aug_label'])
 pprint(val_results_dict['metric'])
-#pprint(val_results_dict['acc'])
-#pprint(val_results_dict['f1'])
+print("\n")
 
 print("############################ FINAL TEST RESULTS AFTER SORTING ############################")
 pprint(sorted_test_results_dict['aug_label'])
 pprint(sorted_test_results_dict['metric'])
-#pprint(sorted_test_results_dict['acc'])
-#pprint(sorted_test_results_dict['f1'])
+print("\n")
 
 print("################################### BEST AUGMENTATION AFTER GREEDY SEARCH ##########################")
 pprint(sorted_test_results_dict['aug_label'][0])
+print("\n")
 
 print("################################### BEST Metric SCORE AFTER GREEDY SEARCH ##########################")
 pprint(sorted_test_results_dict['metric'][0])
-#pprint(sorted_test_results_dict['acc'][0])
-#pprint(sorted_test_results_dict['f1'][0])
+print("\n")
 
 ######## PLOTTING RESULTS ########
 
@@ -589,7 +587,9 @@ aug_bit_vector = utils.plot_greedy_augmentations(new_aug_dict,
 utils.plot_intermidiate_results(val_results_dict, test_results_dict, 
                                 info_dict, save_plot=SAVE_PLOTS)
 
-_similar_augmentations, _similar_aug_labels, _similar_metric = utils.get_best_augmentation_schemes(sorted_test_results_dict)
+_similar_augmentations, _similar_aug_labels, _similar_metric, _similar_bit_vectors = utils.get_best_augmentation_schemes(sorted_test_results_dict, new_aug_dict)
+
+policy_dict = {}
 
 if(len(_similar_aug_labels) > 1):
     print("Greedy search recommends the following policies ...")
@@ -598,16 +598,30 @@ if(len(_similar_aug_labels) > 1):
         _policy = _similar_augmentations[i]
         _policy_labels = _similar_aug_labels[i]
         _metric_val = _similar_metric[i]
+        _bit_vector = _similar_bit_vectors[i]
 
-        print("Policy: {} | Performance: {}".format(_policy_labels, _metric_val))
+        print("Policy: {} | Performance: {} | Bit Vector: {}".format(_policy_labels, _metric_val, _bit_vector))
         print("\n")
+
+        policy_dict['Policy_'+str(i+1)] = _bit_vector
 
 else:
     print("The greedy search recommends only 1 optimal policy.")
+    policy_dict['Policy_1'] = aug_bit_vector
+
+policy_filename = 'greedy_search_' + DATASET + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label + '.yaml'
+policy_root_dir = 'Policies'
+policy_dir = os.path.join(policy_root_dir, ENCODER)
+
+if(not os.path.exists(policy_dir)):
+    os.makedirs(policy_dir)
+
+with open(os.path.join(policy_dir, policy_filename), 'w') as _file:
+    data = yaml.dump(policy_dict, _file, default_flow_style=True)
 
 end_time = time.time()
 
-print("Augmentation Bit Representation: {}".format(aug_bit_vector))
+print("Augmentation Bit Representation for the best policy: {}".format(aug_bit_vector))
 print("Execution Time (hours): {}".format((end_time - start_time)/3600))
 print("Unique Identifier: {}".format(IDENTIFIER))
 print("Metric Used: {}".format(METRIC))
