@@ -67,7 +67,6 @@ elif(device == torch.device(type='cuda')):
 
 #RUN CONSTANTS
 BATCH_SIZE = yaml_data['run']['batch_size']
-TEST_EPOCHS = yaml_data['run']['test_epochs']
 INNER_EPOCHS = yaml_data['run']['inner_epochs']
 EMBEDDINGS_DIM = 2048
 SUBSET = yaml_data['run']['subset']
@@ -116,9 +115,9 @@ SAVED_MODELS_DIR = '../Saved_models'
 
 if(EXPERIMENTAL_RUN):
     INNER_EPOCHS = 3
-    TEST_EPOCHS = 1
     AUTO_LR_FIND = False
     LOGGING = True
+    SAVE_PLOTS = False
 
 if(LOGGING):
 
@@ -157,14 +156,12 @@ crop_width = 224
 pprint(yaml_data)
 
 #Importing augmentations
-augs = standard_augmentations.StandardAugmentations(shuffle=True)   #Augmentations would be obtained in a shuffled order each time
+augs = standard_augmentations.StandardAugmentations(shuffle=True, 
+                                                    experimental_run=EXPERIMENTAL_RUN)   #Augmentations would be obtained in a shuffled order each time
 new_aug_dict = augs.new_aug_dict
 
 all_aug_list = list(new_aug_dict.values())
 all_aug_labels_list = list(new_aug_dict.keys())
-
-#all_aug_list.insert(0, None)
-#all_aug_labels_list.insert(0, 'No Aug')
 
 all_selected_augs = []
 all_selected_augs_labels = []
@@ -576,7 +573,8 @@ info_dict = {
                  'train_mlp': TRAIN_MLP,
                  'use_mean_embeddings': USE_MEAN_EMBEDDINGS,
                  'auto_lr': AUTO_LR_FIND,
-                 'metric': METRIC
+                 'metric': METRIC,
+                 'identifier': IDENTIFIER
             }
 
 aug_bit_vector = utils.plot_greedy_augmentations(new_aug_dict, 
@@ -609,9 +607,9 @@ else:
     print("The greedy search recommends only 1 optimal policy.")
     policy_dict['Policy_1'] = aug_bit_vector
 
-policy_filename = 'greedy_search_' + DATASET + '_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label + '.yaml'
+policy_filename = 'greedy_search_' + ft_label + '_' + mlp_label + '_' + mean_embeddings_label + '_' + auto_lr_label + '.yaml'
 policy_root_dir = 'Policies'
-policy_dir = os.path.join(policy_root_dir, ENCODER)
+policy_dir = os.path.join(policy_root_dir, ENCODER, DATASET)
 
 if(not os.path.exists(policy_dir)):
     os.makedirs(policy_dir)
@@ -621,7 +619,24 @@ with open(os.path.join(policy_dir, policy_filename), 'w') as _file:
 
 end_time = time.time()
 
+no_aug_results = 0
+all_aug_results = 0
+
+for i in zip(sorted_test_results_dict['aug_label'], sorted_test_results_dict['metric']):
+    _results = list(i)
+    _label = _results[0]
+    _metric = _results[1]
+
+    if(_label == 'No Aug'):
+        no_aug_results = _metric
+
+    if(len(_label) == len(new_aug_dict)):
+        all_aug_results = _metric
+
+
 print("Augmentation Bit Representation for the best policy: {}".format(aug_bit_vector))
+print("Results from NO AUGMENTATIONS: {}".format(no_aug_results))
+print("Results from ALL AUGMENTATIONS: {}".format(all_aug_results))
 print("Execution Time (hours): {}".format((end_time - start_time)/3600))
 print("Unique Identifier: {}".format(IDENTIFIER))
 print("Metric Used: {}".format(METRIC))
