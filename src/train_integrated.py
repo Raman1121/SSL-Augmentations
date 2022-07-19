@@ -7,6 +7,7 @@ import numpy as np
 
 from dataset import retinopathy_dataset, cancer_mnist_dataset, mura_dataset, chexpert_dataset
 from model import integrated_model
+from utils import utils
 
 import torch
 from torch import Tensor
@@ -440,6 +441,7 @@ if __name__ == '__main__':
     EMBEDDINGS_DIM = 2048
     SUBSET = yaml_data['run']['subset']
     AUTO_LR_FIND = yaml_data['run']['auto_lr_find']
+    EXPERIMENT = yaml_data['run']['experiment']
 
     #DATASET CONSTANTS
     DATASET_ROOT_PATH = yaml_data['all_datasets'][DATASET]['root_path']
@@ -471,127 +473,27 @@ if __name__ == '__main__':
         T.ToTensor()
     ])
 
-    #Load the train set
-    main_df = pd.read_csv(TRAIN_DF_PATH)
+    basic_transform = T.Compose([
+        T.ToPILImage(),
+        T.Resize((224,224)),
+        T.ToTensor()
+    ])
 
-    ##################################### DATASETS #######################################
+    ##################################### DATASETS & DATALOADERS ################################
 
-    train_dataset = None
-    test_dataset = None
-    val_dataset = None
+    results_dict = utils.get_dataloaders(yaml_data, DATASET, train_transform, basic_transform)
 
-    if(DATASET == 'retinopathy'):
+    train_image_loader = results_dict['train_image_loader']
+    val_image_loader = results_dict['val_image_loader']
+    test_image_loader = results_dict['test_image_loader']
+    ACTIVATION = results_dict['activation']
+    LOSS_FN = results_dict['loss_fn']
+    MULTILABLE = results_dict['multilable']
+    CLASS_WEIGHTS = results_dict['class_weights']
 
-        '''
-        Preparing the Diabetic Retinopathy dataset
-        '''
-        
-        #Load the test set for DR dataset
-        TEST_DF_PATH = yaml_data['all_datasets'][DATASET]['test_df_path']
-        test_df = pd.read_csv(TEST_DF_PATH)
+    ##############################################################################################
 
-        TRAIN_CAT_LABELS = yaml_data['all_datasets'][DATASET]['train_cat_labels']
-        VAL_CAT_LABELS = yaml_data['all_datasets'][DATASET]['val_cat_labels']
-        TEST_CAT_LABELS = yaml_data['all_datasets'][DATASET]['test_cat_labels']
-
-        main_df['image'] = main_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_train/train/'+x))
-        test_df['image'] = test_df['image'].apply(lambda x: str(DATASET_ROOT_PATH+'final_test/test/'+x))
-
-        train_dataset = retinopathy_dataset.RetinopathyDataset(df=main_df, cat_labels_to_include=TRAIN_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-
-        test_dataset = retinopathy_dataset.RetinopathyDataset(df=test_df, cat_labels_to_include=TEST_CAT_LABELS, 
-                                                            transforms=train_transform, subset=SUBSET)
-
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
-    elif(DATASET == 'cancer_mnist'):
-
-        '''
-        Preparing the Cancer MNIST dataset
-        '''
-
-        #NOTE: Test data for this dataset has not been provided!
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-
-        train_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=train_df, transforms=train_transform, 
-                                                                subset=SUBSET)
-
-        test_dataset = cancer_mnist_dataset.CancerMNISTDataset(df=test_df, transforms=train_transform, 
-                                                                subset=SUBSET)
-
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
-    elif(DATASET == 'chexpert'):
-        '''
-        Preparing the CheXpert dataset
-        '''
-        #NOTE: Test data for this dataset has not been provided!
-
-        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-        val_df = pd.read_csv(VAL_DF_PATH)
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-
-        
-        train_dataset = chexpert_dataset.ChexpertDataset(df=train_df, transforms=train_transform, 
-                                                        subset=SUBSET)
-
-        val_dataset = chexpert_dataset.ChexpertDataset(df=val_df, transforms=train_transform,
-                                                        subset=SUBSET)
-
-        test_dataset = chexpert_dataset.ChexpertDataset(df=test_df, transforms=train_transform, 
-                                                        subset=SUBSET)
-
-        ACTIVATION = 'sigmoid'
-        LOSS_FN = 'bce'
-        MULTILABLE = True
-        
-    elif(DATASET == 'mura'):
-        '''
-        Preparing the MURA dataset
-        '''
-
-        #NOTE: Test data for this dataset has not been provided!
-
-        VAL_DF_PATH = yaml_data['all_datasets'][DATASET]['val_df_path']
-        val_df = pd.read_csv(VAL_DF_PATH)
-
-        # Creating training and test splits
-        train_df, test_df = train_test_split(main_df, test_size=VALIDATION_SPLIT,
-                                    random_state=SEED)
-
-        train_df = train_df.reset_index(drop=True)
-        test_df = test_df.reset_index(drop=True)
-
-        train_dataset = mura_dataset.MuraDataset(df=train_df, transforms=train_transform, 
-                                                                subset=SUBSET)
-
-        val_dataset = mura_dataset.MuraDataset(df=val_df, transforms=train_transform,
-                                                                subset=SUBSET)
-
-        test_dataset = mura_dataset.MuraDataset(df=test_df, transforms=train_transform, 
-                                                                subset=SUBSET)
-                                          
-        ACTIVATION = 'softmax'
-        LOSS_FN = 'cross_entropy'
-        MULTILABLE = False
-
-    #######################################################################################
+    assert MODEL in ['dorsal', 'ventral', 'default']
 
     try:
         if(MODEL == 'dorsal'):
@@ -609,43 +511,42 @@ if __name__ == '__main__':
     encoder_model = ImageNetModel(load_path, device=device)
 
     #Creating Data Loaders
-    if(train_dataset != None):
-        train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
-    if(test_dataset != None):
-        test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
-    if(val_dataset != None):
-        val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
+    # if(train_dataset != None):
+    #     train_image_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=12)
+    # if(test_dataset != None):
+    #     test_image_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
+    # if(val_dataset != None):
+    #     val_image_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=12)
 
 
     integrated_model = integrated_model.IntegratedModel(input_dim=EMBEDDINGS_DIM, output_dim=NUM_CLASSES, encoder=encoder_model,
                                                         learning_rate = lr_rate, batch_size=BATCH_SIZE, 
-                                                        lr_scheduler='reduce_plateau')
+                                                        lr_scheduler='reduce_plateau', activation=ACTIVATION,
+                                                        multilable=MULTILABLE, class_weights=CLASS_WEIGHTS,
+                                                        criterion=LOSS_FN)
+
+    es = EarlyStopping('val_loss', check_finite=True, patience=20, verbose=True)
+    mc = ModelCheckpoint(monitor='val_loss',
+                         dirpath=os.path.join('lightning_logs/', EXPERIMENT), auto_insert_metric_name=True,
+                         filename='{epoch:02d}-{val_loss:.2f}',
+                         every_n_epochs=1)
 
     trainer = pl.Trainer(gpus=GPUs, 
-                        max_epochs=EPOCHS)
+                        max_epochs=EPOCHS,
+                        callbacks=[es, mc])
 
     if(AUTO_LR_FIND):
-        lr_finder = trainer.tuner.lr_find(integrated_model, train_image_loader)
+        lr_finder = trainer.tuner.lr_find(integrated_model, train_image_loader, update_attr=True)
         new_lr = lr_finder.suggestion()
         print("New suggested learning rate is: ", new_lr)
         integrated_model.hparams.learning_rate = new_lr
 
+    trainer.fit(integrated_model, train_image_loader, val_image_loader)
 
-    if(val_dataset == None):
+    print("################ Initiating testing process #####################")
+    test_results = trainer.test(dataloaders=test_image_loader, ckpt_path='best')
 
-        print("Validation dataset not provided for {} dataset".format(DATASET))
-        #Providing data loader for only the train set in the fit method.
-        trainer.fit(integrated_model, train_image_loader)
-
-    elif(val_dataset != None):
-
-        #Providing data loader for both the train and val set in the fit method.
-        trainer.fit(integrated_model, train_image_loader, val_image_loader)
-
-    if(test_dataset != None):
-        trainer.test(dataloaders=test_image_loader)
-    else:
-        print("Test data not provided for {} dataset hence, skipping testing.".format(DATASET))
+    print(test_results)
 
 
 
